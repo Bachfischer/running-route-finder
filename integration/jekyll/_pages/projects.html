@@ -1,0 +1,15 @@
+---
+layout: archive
+title: "Projects"
+permalink: /projects/
+author_profile: true
+---
+
+{% include base_path %}
+
+<p>Experiments and tools at the intersection of data, engineering, and everyday life.</p>
+
+{% assign projects = site.portfolio | sort: 'date' | reverse %}
+{% for post in projects %}
+  {% include archive-single.html %}
+{% endfor %}

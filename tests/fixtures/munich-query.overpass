@@ -1,0 +1,7 @@
+[out:json][timeout:35][maxsize:67108864];way(around:2650,48.151893,11.577000)[highway~"^(footway|path|pedestrian|living_street|residential|service|track|unclassified|tertiary|tertiary_link|secondary|secondary_link|steps|cycleway)$"][area!=yes]->.ways;
+.ways out body qt;
+node(w.ways)->.nodes;
+(node.nodes[highway=traffic_signals];node.nodes[crossing=traffic_signals];node.nodes["crossing:signals"=yes];node.nodes[barrier];node.nodes[access];node.nodes[foot];node.nodes["access:conditional"];node.nodes["foot:conditional"];)->.restrictions;
+.restrictions out body qt;
+(.nodes; - .restrictions;);out skel qt;
+(nwr(around:2650,48.151893,11.577000)[leisure~"^(park|garden|nature_reserve)$"];nwr(around:2650,48.151893,11.577000)[landuse~"^(forest|recreation_ground)$"];);out geom qt;
