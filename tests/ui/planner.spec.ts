@@ -239,20 +239,51 @@ test("embedded planner hides surrounding website navigation", async ({
     page.getByRole("heading", { name: "Plan your run" }),
   ).toBeVisible();
 });
-test("Projects integration links back to the working planner", async ({
-  page,
-}) => {
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Projects" })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Projects", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Running route finder", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Plan your run" }),
-  ).toBeVisible();
-});
+for (const name of ["Running route finder", "Launch route finder"]) {
+  test(`Projects integration launches the planner: ${name}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Projects" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Projects", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Plan your run" }),
+    ).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const name of ["Running route finder", "Launch route finder"]) {
+  test(`Projects launch works without JavaScript: ${name}`, async ({
+    browser,
+    baseURL,
+    viewport,
+    isMobile,
+    hasTouch,
+  }) => {
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      baseURL,
+      viewport,
+      isMobile,
+      hasTouch,
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto("/projects/");
+      await page.getByRole("link", { name, exact: true }).click();
+      await expect(
+        page.getByRole("heading", { name: "Plan your run" }),
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+}

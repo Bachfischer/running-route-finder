@@ -81,7 +81,7 @@ export function canWalk(t: Record<string, string>) {
   if (
     ["secondary", "secondary_link"].includes(t.highway) &&
     !permitted.has(t.foot) &&
-    !["yes", "both", "left", "right", "separate"].includes(t.sidewalk)
+    !["yes", "both", "left", "right"].includes(t.sidewalk)
   )
     return false;
   return true;
@@ -260,6 +260,71 @@ function nearest(g: Graph, point: Coord) {
   }
   return { id, distance: best };
 }
+// Project onto an existing walkable segment; never connect unrelated ways.
+export function snapToPath(g: Graph, point: Coord) {
+  const snap = nearest(g, point);
+  let selected: { a: number; b: number; coord: Coord } | undefined;
+  const cos = Math.cos(point[1] * rad);
+  const longitudeDelta = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+  for (const [a, vertex] of g) {
+    for (const edge of vertex.edges) {
+      const end = g.get(edge.to)!.coord;
+      const dx = longitudeDelta(end[0], vertex.coord[0]);
+      const dy = end[1] - vertex.coord[1];
+      const length2 = (dx * cos) ** 2 + dy ** 2;
+      if (!length2) continue;
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          (longitudeDelta(point[0], vertex.coord[0]) * dx * cos ** 2 +
+            (point[1] - vertex.coord[1]) * dy) /
+            length2,
+        ),
+      );
+      if (t <= 1e-9 || t >= 1 - 1e-9) continue;
+      const coord: Coord = [vertex.coord[0] + t * dx, vertex.coord[1] + t * dy];
+      if (coord[0] > 180) coord[0] -= 360;
+      if (coord[0] < -180) coord[0] += 360;
+      const distance = meters(point, coord);
+      if (distance < snap.distance) {
+        snap.distance = distance;
+        selected = { a, b: edge.to, coord };
+      }
+    }
+  }
+  if (!selected || snap.distance > 300) return snap;
+  let id = -2;
+  while (g.has(id)) id--;
+  const { a, b, coord } = selected;
+  const vertex: Vertex = { coord, edges: [] };
+  g.set(id, vertex);
+  // Split only the directed edges that already exist. The signal penalty
+  // stays at the original endpoint, and both halves retain their scenery.
+  for (const [from, to] of [
+    [a, b],
+    [b, a],
+  ]) {
+    const origin = g.get(from)!;
+    const index = origin.edges.findIndex((edge) => edge.to === to);
+    if (index === -1) continue;
+    const edge = origin.edges[index];
+    const key = (u: number, v: number) => `${Math.min(u, v)}:${Math.max(u, v)}`;
+    origin.edges[index] = {
+      ...edge,
+      to: id,
+      length: meters(origin.coord, coord),
+      signalCost: 0,
+      key: key(from, id),
+    };
+    vertex.edges.push({
+      ...edge,
+      length: meters(coord, g.get(to)!.coord),
+      key: key(id, to),
+    });
+  }
+  return { id, distance: snap.distance };
+}
 export function destination(start: Coord, d: number, bearing: number): Coord {
   const a = d / 6371000,
     b = bearing * rad,
@@ -365,7 +430,7 @@ export function findLoops(
     throw Error("Choose a distance between 2 and 25 km and a valid direction.");
   if (elements.length > 130000) throw new MapCapacityError();
   const g = graphFrom(elements),
-    snap = nearest(g, start);
+    snap = snapToPath(g, start);
   if (snap.id === -1 || snap.distance > 300)
     throw new RouteError(
       "NO_START",

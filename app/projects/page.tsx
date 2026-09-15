@@ -1,4 +1,5 @@
-import Link from "next/link";
+/* Standard document navigation avoids the Vinext Link hydration failure on touch devices. */
+/* eslint-disable @next/next/no-html-link-for-pages */
 import Image from "next/image";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 export const metadata = { title: "Projects — Matthias Bachfischer" };
@@ -29,7 +30,7 @@ export default function Projects() {
           </p>
           <article className="project-entry">
             <h2>
-              <Link href="/">Running route finder</Link>
+              <a href="/">Running route finder</a>
             </h2>
             <div className="project-meta">
               Interactive tool · September 2026
@@ -46,9 +47,9 @@ export default function Projects() {
               <span>Graph search</span>
               <span>Cloudflare Workers</span>
             </div>
-            <Link className="project-launch" href="/">
+            <a className="project-launch" href="/">
               Launch route finder
-            </Link>
+            </a>
             <div className="project-method">
               <h3>How it works</h3>
               <p>
