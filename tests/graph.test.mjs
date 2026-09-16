@@ -273,7 +273,7 @@ for (const direction of ["yes", "-1"])
     const to = direction === "yes" ? 2 : 1;
     assert.equal(g.get(snap.id).edges.length, 1);
     assert.equal(g.get(snap.id).edges[0].to, to);
-    assert.equal(g.get(snap.id).edges[0].signalCost, 180);
+    assert.equal(g.get(snap.id).edges[0].signalCost, 600);
     assert.equal(g.get(from).edges.find((e) => e.to === snap.id).signalCost, 0);
     assert.ok(!g.get(to).edges.some((e) => e.to === snap.id));
   });

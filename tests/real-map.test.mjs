@@ -13,9 +13,13 @@ test("real Munich regression: 10 km route closes, follows graph and stays near t
   const route = found.routes[0];
   assert.ok(Math.abs(route.distance - 10000) < 500);
   assert.ok(route.repeat < 0.05);
-  assert.ok(route.parks > 0.7);
-  assert.ok(route.paths > 0.9);
+  assert.ok(route.parks > 0.88);
+  assert.ok(route.paths > 0.98);
   assert.equal(route.trafficLights, 0);
+  assert.equal(route.crossings, 0);
+  assert.equal(route.barriers, 0);
+  assert.equal(route.railwayCrossings, 0);
+  assert.equal(route.steps, 0);
   assert.deepEqual(route.coordinates[0], route.coordinates.at(-1));
   assert.ok(found.snapDistance < 30);
   let length = 0;

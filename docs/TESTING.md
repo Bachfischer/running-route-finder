@@ -8,7 +8,7 @@
 | Real map | Included above | Recorded Odeonsplatz network, actual park boundaries and signals; route continuity/closure/distance and quality assertions |
 | Memory regression | `pnpm test:memory` | Runs real Munich routing with a 96 MB Node heap ceiling |
 | Cloudflare runtime | `pnpm build && pnpm test:worker` | Loads the compiled production modules in workerd and exercises validation, coordinate search and 10 km routing with recorded external data |
-| Browser | `pnpm test:ui` after build/config | Playwright desktop and mobile Chromium; 21 scenarios each, screenshots and traces on failure |
+| Browser | `pnpm test:ui` after build/config | Playwright desktop and mobile Chromium; 24 scenarios each, screenshots and traces on failure |
 | Deployment | `pnpm test:deployment URL` | HTTPS page, coordinate API and invalid route input; no Overpass request |
 | External availability | `pnpm test:live` | Explicit live Munich Overpass request, excluded from routine CI |
 
@@ -22,13 +22,15 @@ UI tests cover empty state, example setup, three invalid distance cases, distanc
 
 ## Verification boundaries
 
-The live Node provider/algorithm smoke check passed for Munich. The managed development browser exercised the real form and provider-error recovery; its workerd backend could not reach Overpass. The success screen and alternatives were therefore visually checked using the recorded real route with a temporary local handler, restored before the production build. Browser checks and generated CI tests are different evidence: the Playwright suite must run in your GitHub environment before its status is considered passing. The included workflow installs Chromium and executes it automatically. The first GitHub run passed all 181 original core tests and 35 of 36 browser cases; the mobile Projects failure exposed a Vinext Link runtime error. Standard document links fix that dependency, with regression cases for both launch links. The expanded core suite now contains 190 tests, including segment snapping and separately mapped sidewalk access. Local controlled-browser checks do not claim a completed remote GitHub Actions run.
+The initialization PR passed 190 core tests and 42 desktop/mobile cases in GitHub Actions. This update adds interruption classification, cost invariance under geometry subdivision, strict-then-relaxed path search, surface start preference, distinct alternatives, and single-action location lookup tests. The new browser suite has 48 cases. CI remains the authoritative status for each PR.
 
-The recorded result is approximately 9.974 km, 74.3% mapped green spaces, 91.9% paths/tracks, 4.6% repeated distance and zero mapped traffic-light encounters. These describe OSM data, not a physically surveyed route, current closures or unmapped lights. The comparison trades some repeated distance for substantially more green coverage.
+The refreshed 2026-09-15 Munich extract yields 10.260 km, 90.4% mapped green spaces, 99.3% paths/tracks, 2.5% repeated distance and zero mapped traffic-light, crossing, barrier, railway and stair encounters. The real-map regression asserts these properties with tolerances, not an exact route snapshot. OSM-derived counts cannot establish current closures, crowds or unmapped obstacles.
+
+Production workerd tests use the recorded external response with the real production handler and algorithm. UI tests use the derived route response to isolate UI behavior from public provider availability. No fixture is served by the production app as a fallback.
 
 ## Reproduce and refresh
 
-The fixture was obtained on 2026-09-13 from the query in `tests/fixtures/munich-query.overpass`. It is ODbL data with attribution in `tests/fixtures/README.md`. Refresh deliberately, preserve routing/access/green-space/signal information, recompute `munich-result.json` with `findLoops`, and review changes in quality rather than blindly accepting new snapshots. No snapshot file is ever served as a fallback route.
+The fixture was obtained on 2026-09-15 from the query in `tests/fixtures/munich-query.overpass`. It is ODbL data with attribution in `tests/fixtures/README.md`. Refresh deliberately, preserve routing/access/green-space/signal information, recompute `munich-result.json` with `findLoops`, and review changes in quality rather than blindly accepting new snapshots. No snapshot file is ever served as a fallback route.
 
 The CI suite intentionally does not repeatedly call public geocoding/routing services. Run the opt-in live check when changing queries/provider contracts, and verify deployment smoke checks after changing Worker packaging or routing.
 

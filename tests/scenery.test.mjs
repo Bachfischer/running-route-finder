@@ -124,7 +124,7 @@ test("traffic signal cost selects a slightly longer unsignalled path", () => {
     ),
   );
   assert.deepEqual(shortest(graph, 1, 3, new Set(), 10000), [1, 4, 3]);
-  assert.equal(graph.get(1).edges.find((e) => e.to === 2).signalCost, 180);
+  assert.equal(graph.get(1).edges.find((e) => e.to === 2).signalCost, 600);
   assert.equal(graph.get(2).edges.find((e) => e.to === 1).signalCost, 0);
 });
 test("park route wins over a shorter street route", () => {
