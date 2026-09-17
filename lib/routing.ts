@@ -1,3 +1,4 @@
+import { interruptions, type Interruptions } from "./interruptions.ts";
 import { greenAreas, inGreenArea, isTrafficSignal } from "./scenery.ts";
 import { MapCapacityError, RouteError } from "./errors.ts";
 export type Coord = [number, number];
@@ -18,6 +19,11 @@ export type Loop = {
   paths: number;
   parks: number;
   trafficLights: number;
+  crossings: number;
+  barriers: number;
+  railwayCrossings: number;
+  steps: number;
+  sharpTurns: number;
   score: number;
   bearing: number;
 };
@@ -31,11 +37,20 @@ type Edge = {
   length: number;
   factor: number;
   path: boolean;
+  startAllowed?: boolean;
   park?: boolean;
   signalCost?: number;
+  interruptionCost?: number;
+  wayCost?: number;
+  features?: Interruptions;
   key: string;
 };
-type Vertex = { coord: Coord; edges: Edge[]; signal?: boolean };
+type Vertex = {
+  coord: Coord;
+  edges: Edge[];
+  signal?: boolean;
+  features?: Interruptions;
+};
 export type Graph = Map<number, Vertex>;
 const rad = Math.PI / 180;
 export function meters(a: Coord, b: Coord) {
@@ -102,6 +117,7 @@ export function graphFrom(elements: OSMElement[]): Graph {
         coord: [n.lon!, n.lat!],
         edges: [],
         signal: isTrafficSignal(n.tags || {}),
+        features: interruptions(n.tags || {}),
       });
       const t = n.tags || {};
       if (
@@ -125,8 +141,30 @@ export function graphFrom(elements: OSMElement[]): Graph {
       : ["living_street", "residential"].includes(t.highway)
         ? 1.12
         : t.highway === "steps"
-          ? 1.8
+          ? 6
           : 1.4;
+    const features = interruptions(t);
+    let wayLength = 0;
+    for (let i = 1; i < way.nodes.length; i++) {
+      const a = graph.get(way.nodes[i - 1]),
+        b = graph.get(way.nodes[i]);
+      if (a && b) wayLength += meters(a.coord, b.coord);
+    }
+    const hasSignalNode = way.nodes.some(
+      (id) => graph.get(id)?.features?.signal,
+    );
+    const hasCrossingNode = way.nodes.some(
+      (id) => graph.get(id)?.features?.crossing,
+    );
+    // Way-only markings receive one length-distributed cost, independent of
+    // how many geometry nodes the mapper inserted. Node markings take priority.
+    const wayCost =
+      (features.signal && !hasSignalNode ? 600 : 0) +
+      (features.crossing && !hasCrossingNode && !features.signal ? 120 : 0);
+    const nodeCost = (v: Vertex) =>
+      (v.features?.crossing && !v.signal ? 120 : 0) +
+      (v.features?.barrier ? 180 : 0) +
+      (v.features?.railway ? 900 : 0);
     for (let i = 1; i < way.nodes.length; i++) {
       const a = way.nodes[i - 1],
         b = way.nodes[i],
@@ -147,8 +185,17 @@ export function graphFrom(elements: OSMElement[]): Graph {
           length,
           factor: runningFactor,
           path,
+          startAllowed:
+            !features.steps &&
+            t.tunnel !== "yes" &&
+            t.indoor !== "yes" &&
+            !(Number(t.layer) < 0) &&
+            !(Number(t.level) < 0),
           park,
-          signalCost: nb.signal ? 180 : 0,
+          signalCost: nb.signal ? 600 : 0,
+          interruptionCost: nodeCost(nb) + (wayCost * length) / wayLength,
+          features,
+          wayCost: (wayCost * length) / wayLength,
           key,
         });
       if (
@@ -161,8 +208,17 @@ export function graphFrom(elements: OSMElement[]): Graph {
           length,
           factor: runningFactor,
           path,
+          startAllowed:
+            !features.steps &&
+            t.tunnel !== "yes" &&
+            t.indoor !== "yes" &&
+            !(Number(t.layer) < 0) &&
+            !(Number(t.level) < 0),
           park,
-          signalCost: na.signal ? 180 : 0,
+          signalCost: na.signal ? 600 : 0,
+          interruptionCost: nodeCost(na) + (wayCost * length) / wayLength,
+          features,
+          wayCost: (wayCost * length) / wayLength,
           key,
         });
     }
@@ -208,6 +264,7 @@ export function shortest(
   end: number,
   used: Set<string>,
   max: number,
+  uninterrupted = false,
 ): number[] | null {
   if (start === end) return [start];
   const target = g.get(end)!.coord,
@@ -232,10 +289,21 @@ export function shortest(
     }
     const current = cost.get(item.id)!;
     for (const edge of v.edges) {
+      const destinationFeatures = g.get(edge.to)!.features;
+      if (
+        uninterrupted &&
+        (edge.features?.steps ||
+          edge.features?.signal ||
+          g.get(edge.to)!.signal ||
+          destinationFeatures?.barrier ||
+          destinationFeatures?.railway)
+      )
+        continue;
       const next =
         current +
         edge.length * edge.factor * (used.has(edge.key) ? 4 : 1) +
-        (edge.signalCost || 0);
+        (edge.signalCost || 0) +
+        (edge.interruptionCost || 0);
       if (next > max || next >= (cost.get(edge.to) ?? Infinity)) continue;
       cost.set(edge.to, next);
       prev.set(edge.to, item.id);
@@ -247,11 +315,15 @@ export function shortest(
   }
   return null;
 }
-function nearest(g: Graph, point: Coord) {
+function nearest(g: Graph, point: Coord, surfaceOnly = false) {
   let id = -1,
     best = Infinity;
   for (const [k, v] of g) {
-    if (!v.edges.length) continue;
+    if (
+      !v.edges.length ||
+      (surfaceOnly && !v.edges.some((e) => e.startAllowed !== false))
+    )
+      continue;
     const d = meters(point, v.coord);
     if (d < best) {
       best = d;
@@ -261,13 +333,18 @@ function nearest(g: Graph, point: Coord) {
   return { id, distance: best };
 }
 // Project onto an existing walkable segment; never connect unrelated ways.
-export function snapToPath(g: Graph, point: Coord) {
-  const snap = nearest(g, point);
+export function snapToPath(
+  g: Graph,
+  point: Coord,
+  surfaceOnly = true,
+): { id: number; distance: number } {
+  const snap = nearest(g, point, surfaceOnly);
   let selected: { a: number; b: number; coord: Coord } | undefined;
   const cos = Math.cos(point[1] * rad);
   const longitudeDelta = (a: number, b: number) => ((a - b + 540) % 360) - 180;
   for (const [a, vertex] of g) {
     for (const edge of vertex.edges) {
+      if (surfaceOnly && edge.startAllowed === false) continue;
       const end = g.get(edge.to)!.coord;
       const dx = longitudeDelta(end[0], vertex.coord[0]);
       const dy = end[1] - vertex.coord[1];
@@ -293,6 +370,7 @@ export function snapToPath(g: Graph, point: Coord) {
       }
     }
   }
+  if (snap.distance > 300 && surfaceOnly) return snapToPath(g, point, false);
   if (!selected || snap.distance > 300) return snap;
   let id = -2;
   while (g.has(id)) id--;
@@ -315,10 +393,19 @@ export function snapToPath(g: Graph, point: Coord) {
       to: id,
       length: meters(origin.coord, coord),
       signalCost: 0,
+      interruptionCost:
+        ((edge.wayCost || 0) * meters(origin.coord, coord)) / edge.length,
+      wayCost:
+        ((edge.wayCost || 0) * meters(origin.coord, coord)) / edge.length,
       key: key(from, id),
     };
     vertex.edges.push({
       ...edge,
+      interruptionCost:
+        (edge.interruptionCost || 0) -
+        ((edge.wayCost || 0) * meters(origin.coord, coord)) / edge.length,
+      wayCost:
+        ((edge.wayCost || 0) * meters(coord, g.get(to)!.coord)) / edge.length,
       length: meters(coord, g.get(to)!.coord),
       key: key(id, to),
     });
@@ -351,7 +438,7 @@ export const compass: Record<string, number> = {
   W: 270,
   NW: 315,
 };
-function routeInfo(
+export function routeInfo(
   g: Graph,
   ids: number[],
   target: number,
@@ -362,10 +449,16 @@ function routeInfo(
     path = 0,
     park = 0,
     trafficLights = 0,
+    crossings = 0,
+    barriers = 0,
+    railwayCrossings = 0,
+    steps = 0,
+    sharpTurns = 0,
     x = 0,
     y = 0;
   const seen = new Set<string>(),
     origin = g.get(ids[0])!.coord;
+  let previousFeatures = interruptions({});
   for (let i = 1; i < ids.length; i++) {
     const a = g.get(ids[i - 1])!,
       b = g.get(ids[i])!,
@@ -375,7 +468,34 @@ function routeInfo(
     seen.add(e.key);
     if (e.path) path += e.length;
     if (e.park) park += e.length;
-    if (b.signal) trafficLights++;
+    const features = {
+      signal: !!(e.features?.signal || b.features?.signal || b.signal),
+      crossing: !!(e.features?.crossing || b.features?.crossing),
+      barrier: !!b.features?.barrier,
+      railway: !!b.features?.railway,
+      steps: !!e.features?.steps,
+    };
+    if (features.signal && !previousFeatures.signal) trafficLights++;
+    if (features.crossing && !previousFeatures.crossing) crossings++;
+    if (features.barrier && !previousFeatures.barrier) barriers++;
+    if (features.railway && !previousFeatures.railway) railwayCrossings++;
+    if (features.steps) steps += e.length;
+    previousFeatures = features;
+    if (i > 1 && a.edges.length >= 3) {
+      const before = g.get(ids[i - 2])!.coord;
+      const dx1 = (a.coord[0] - before[0]) * Math.cos(a.coord[1] * rad);
+      const dy1 = a.coord[1] - before[1];
+      const dx2 = (b.coord[0] - a.coord[0]) * Math.cos(a.coord[1] * rad);
+      const dy2 = b.coord[1] - a.coord[1];
+      const dot =
+        (dx1 * dx2 + dy1 * dy2) / (Math.hypot(dx1, dy1) * Math.hypot(dx2, dy2));
+      if (
+        meters(before, a.coord) >= 5 &&
+        e.length >= 5 &&
+        dot < Math.cos(110 * rad)
+      )
+        sharpTurns++;
+    }
     x +=
       (((b.coord[0] - origin[0] + 540) % 360) - 180) *
       Math.cos(origin[1] * rad) *
@@ -391,11 +511,16 @@ function routeInfo(
     paths = path / distance;
   const score =
     (Math.abs(distance - target) / target) * 6 +
-    repeat * 3 +
-    alignment * 0.9 +
+    repeat * 4 +
+    alignment * 0.4 +
     (1 - paths) * 0.12 +
-    (1 - park / distance) * 2 +
-    trafficLights * 0.12;
+    (1 - park / distance) * 3 +
+    trafficLights * 0.65 +
+    crossings * 0.2 +
+    barriers * 0.35 +
+    railwayCrossings * 0.9 +
+    steps * 0.015 +
+    sharpTurns * 0.04;
   return {
     coordinates: ids.map((id) => g.get(id)!.coord),
     distance,
@@ -403,6 +528,11 @@ function routeInfo(
     paths,
     parks: park / distance,
     trafficLights,
+    crossings,
+    barriers,
+    railwayCrossings,
+    steps,
+    sharpTurns,
     score,
     bearing,
   };
@@ -483,7 +613,9 @@ export function findLoops(
           ids = [snap.id];
         let ok = true;
         for (const goal of [a.id, b.id, snap.id]) {
-          const leg = shortest(g, ids[ids.length - 1], goal, used, target * 6);
+          const leg =
+            shortest(g, ids[ids.length - 1], goal, used, target * 6, true) ??
+            shortest(g, ids[ids.length - 1], goal, used, target * 6);
           if (!leg) {
             ok = false;
             break;
@@ -503,14 +635,6 @@ export function findLoops(
           info.repeat > 0.3
         )
           continue;
-        if (
-          routes.some(
-            (r) =>
-              Math.abs(r.distance - info.distance) < 30 &&
-              Math.abs(r.bearing - info.bearing) < 10,
-          )
-        )
-          continue;
         routes.push(info);
       }
   routes.sort((a, b) => a.score - b.score);
@@ -519,9 +643,36 @@ export function findLoops(
       "NO_LOOP",
       "No suitable loop found on the available paths. Try another direction or a nearby starting point.",
     );
+  const distinct: Loop[] = [];
+  for (const route of routes) {
+    if (distinct.every((other) => routeOverlap(route, other) < 0.85))
+      distinct.push(route);
+    if (distinct.length === 3) break;
+  }
   return {
-    routes: routes.slice(0, 3),
+    routes: distinct,
     snapDistance: snap.distance,
     candidates: attempts,
   };
+}
+
+// Compare undirected path segments, so reversing the same loop is not an alternative.
+export function routeOverlap(a: Loop, b: Loop) {
+  const segments = (r: Loop) => {
+    const result = new Map<string, number>();
+    for (let i = 1; i < r.coordinates.length; i++) {
+      const u = r.coordinates[i - 1],
+        v = r.coordinates[i];
+      const key = [u.join(","), v.join(",")].sort().join(":");
+      result.set(key, meters(u, v));
+    }
+    return result;
+  };
+  const first = segments(a),
+    second = segments(b);
+  let shared = 0;
+  for (const [key, length] of first) if (second.has(key)) shared += length;
+  const length = (m: Map<string, number>) =>
+    [...m.values()].reduce((s, n) => s + n, 0);
+  return shared / Math.max(1, Math.min(length(first), length(second)));
 }

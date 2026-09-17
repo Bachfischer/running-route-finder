@@ -34,7 +34,7 @@ export function mapQuery(area: SearchArea): string {
   return `[out:json][timeout:35][maxsize:67108864];way(around:${Math.round(area.radius)},${lat.toFixed(6)},${lon.toFixed(6)})[highway~"^(footway|path|pedestrian|living_street|residential|service|track|unclassified|tertiary|tertiary_link|secondary|secondary_link|steps|cycleway)$"][area!=yes]->.ways;
 .ways out body qt;
 node(w.ways)->.nodes;
-(node.nodes[highway=traffic_signals];node.nodes[crossing=traffic_signals];node.nodes["crossing:signals"=yes];node.nodes[barrier];node.nodes[access];node.nodes[foot];node.nodes["access:conditional"];node.nodes["foot:conditional"];)->.restrictions;
+(node.nodes[highway=traffic_signals];node.nodes[highway=crossing];node.nodes[crossing];node.nodes[railway];node.nodes[crossing=traffic_signals];node.nodes["crossing:signals"=yes];node.nodes[barrier];node.nodes[access];node.nodes[foot];node.nodes["access:conditional"];node.nodes["foot:conditional"];)->.restrictions;
 .restrictions out body qt;
 (.nodes; - .restrictions;);out skel qt;
 (nwr(around:${Math.round(area.radius)},${lat.toFixed(6)},${lon.toFixed(6)})[leisure~"^(park|garden|nature_reserve)$"];nwr(around:${Math.round(area.radius)},${lat.toFixed(6)},${lon.toFixed(6)})[landuse~"^(forest|recreation_ground)$"];);out geom qt;`;
@@ -113,7 +113,12 @@ export async function searchLoops(
         // Keep the requested target unchanged even when the search footprint shrinks.
         if (
           Math.abs(result.routes[0].distance - target) / target <= 0.12 &&
-          result.routes[0].repeat <= 0.15
+          result.routes[0].repeat <= 0.1 &&
+          result.routes[0].trafficLights === 0 &&
+          result.routes[0].crossings <= 2 &&
+          result.routes[0].barriers === 0 &&
+          result.routes[0].railwayCrossings === 0 &&
+          result.routes[0].steps < 1
         )
           return result;
         break;
@@ -136,6 +141,8 @@ export async function searchLoops(
           lastRouteError = e;
           break;
         }
+        // Keep an already-computed real route if a later improvement query fails.
+        if (best && e instanceof ProviderError) return best;
         // Throttling/timeouts are not a reason to hammer another public endpoint.
         throw e;
       }

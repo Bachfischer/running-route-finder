@@ -176,3 +176,26 @@ for (const payload of [
       ProviderError,
     );
   });
+
+test("later provider failure preserves a real route already found", async () => {
+  const data = grid();
+  for (const element of data)
+    if (element.type === "node") element.tags = { barrier: "gate" };
+  let calls = 0;
+  const result = await searchLoops(
+    { lat: 48.14, lon: 11.58, distance: 5, direction: "Any" },
+    async () => {
+      if (++calls === 1) return data;
+      throw new ProviderError("busy", 429);
+    },
+  );
+  assert.equal(calls, 2);
+  assert.ok(result.routes.length > 0);
+  assert.ok(result.routes[0].barriers > 0);
+});
+test("map query preserves unsignalled and railway crossing nodes", () => {
+  const query = mapQuery({ center: [11.577, 48.142], radius: 2650 });
+  assert.ok(query.includes("node.nodes[highway=crossing]"));
+  assert.ok(query.includes("node.nodes[crossing]"));
+  assert.ok(query.includes("node.nodes[railway]"));
+});

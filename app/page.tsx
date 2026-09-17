@@ -25,7 +25,7 @@ export default function Home() {
   const [query, setQuery] = useState(""),
     [place, setPlace] = useState<Place | null>(null),
     [places, setPlaces] = useState<Place[]>([]),
-    [distance, setDistance] = useState("5"),
+    [distance, setDistance] = useState("10"),
     [direction, setDirection] = useState("Any"),
     [busy, setBusy] = useState(false),
     [searching, setSearching] = useState(false),
@@ -154,6 +154,14 @@ export default function Home() {
       const data = (await res.json()) as { places: Place[]; error?: string };
       if (id !== request.current) return;
       if (!res.ok) throw Error(data.error);
+      if (data.places.length === 1) {
+        const match = data.places[0];
+        setPlace(match);
+        setQuery(match.name);
+        setPlaces([]);
+        setResult(null);
+        return match;
+      }
       setPlaces(data.places);
       if (!data.places.length)
         setError(
@@ -200,10 +208,8 @@ export default function Home() {
     );
   }
   async function find() {
-    if (!place) {
-      setError("Choose a starting location first.");
-      return;
-    }
+    const start = place ?? (await search());
+    if (!start) return;
     busyRef.current = true;
     setBusy(true);
     setError("");
@@ -213,7 +219,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...place,
+          ...start,
           distance: Number(distance),
           direction,
         }),
@@ -251,16 +257,8 @@ export default function Home() {
         <>
           <SiteHeader />
           <div className="project-heading">
-            <div className="breadcrumbs">
-              <a href="/projects/">Projects</a>
-              <span>/</span>
-              <span>Running route finder</span>
-            </div>
             <h1>Running route finder</h1>
-            <p>
-              Find a loop from your doorstep. Choose a distance, explore a
-              direction, and head back to where you started.
-            </p>
+            <p>Prefer parks. Cross fewer roads. Finish where you started.</p>
           </div>
         </>
       )}
@@ -268,12 +266,11 @@ export default function Home() {
         <aside className="sidebar">
           <div className="intro">
             <h2>Plan your run</h2>
-            <p>Choose where to start and how far to go.</p>
           </div>
           <div className="form">
             <fieldset disabled={busy || !hydrated}>
               <label htmlFor="location" className="field-label">
-                <span className="number">01</span> Starting point
+                Starting point
               </label>
               <form
                 onSubmit={(e) => {
@@ -363,14 +360,11 @@ export default function Home() {
                 Try 10 km from Odeonsplatz
               </Button>
               {place && (
-                <p className="selected-start">
-                  Start selected · {place.lat.toFixed(4)},{" "}
-                  {place.lon.toFixed(4)}
-                </p>
+                <p className="selected-start">Start selected · {place.name}</p>
               )}
               <div className="distance-label">
                 <label htmlFor="distance" className="field-label">
-                  <span className="number">02</span> Target distance
+                  Target distance
                 </label>
                 <span>2–25 km</span>
               </div>
@@ -418,7 +412,7 @@ export default function Home() {
               <p id="distance-help" className="field-hint">
                 {Number(distance) < 2 || Number(distance) > 25
                   ? "Enter a distance between 2 and 25 km."
-                  : "Park routes preferred · fewer traffic lights"}
+                  : "Parks and fewer interruptions, always preferred."}
               </p>
               <div className="presets">
                 {[3, 5, 10, 21.1].map((k) => (
@@ -435,46 +429,53 @@ export default function Home() {
                   </Button>
                 ))}
               </div>
-              <label className="field-label">
-                <span className="number">03</span> Head in a direction{" "}
-                <span className="optional">Optional</span>
-              </label>
-              <div
-                className="directions"
-                role="group"
-                aria-label="Preferred direction"
-              >
-                {directions.map((d) => (
-                  <Button
-                    key={d}
-                    variant="outline"
-                    aria-pressed={direction === d}
-                    onClick={() => {
-                      setDirection(d);
-                      setResult(null);
-                    }}
-                  >
-                    {d === "Any" ? (
-                      <>
-                        <Route size={15} />
-                        Any
-                      </>
-                    ) : (
-                      d
-                    )}
-                  </Button>
-                ))}
-              </div>
-              <p className="field-hint">
-                The side of your start you’d like to explore.
-              </p>
+              <details className="direction-options">
+                <summary>
+                  Direction:{" "}
+                  {direction === "Any" ? "best available" : direction}
+                </summary>
+                <label htmlFor="direction" className="field-label">
+                  Preferred direction
+                </label>
+                <select
+                  id="direction"
+                  value={direction}
+                  onChange={(e) => {
+                    setDirection(e.target.value);
+                    setResult(null);
+                  }}
+                >
+                  {directions.map((d) => (
+                    <option key={d} value={d}>
+                      {d === "Any"
+                        ? "Best available"
+                        : (
+                            {
+                              N: "North",
+                              NE: "Northeast",
+                              E: "East",
+                              SE: "Southeast",
+                              S: "South",
+                              SW: "Southwest",
+                              W: "West",
+                              NW: "Northwest",
+                            } as Record<string, string>
+                          )[d]}
+                    </option>
+                  ))}
+                </select>
+                <p className="field-hint">
+                  Choose a side of your start to explore.
+                </p>
+              </details>
             </fieldset>
             <Button
               className="find-button"
               onClick={find}
               disabled={
                 busy ||
-                !place ||
+                searching ||
+                (!place && query.trim().length < 3) ||
                 !Number.isFinite(Number(distance)) ||
                 Number(distance) < 2 ||
                 Number(distance) > 25
@@ -500,7 +501,7 @@ export default function Home() {
               )}
               {busy && (
                 <p className="status">
-                  Loading nearby paths and comparing loops. This can take up to
+                  Looking for park paths with fewer stops. This can take up to
                   two minutes.
                 </p>
               )}
@@ -580,8 +581,8 @@ export default function Home() {
               <div className="empty-card">
                 <LoaderCircle className="spin" />
                 <div>
-                  <h2>Connecting the dots.</h2>
-                  <p>Looking for a loop with less backtracking.</p>
+                  <h2>Finding a smoother run.</h2>
+                  <p>Comparing parks, crossings and repeated paths.</p>
                 </div>
               </div>
             )}
@@ -620,29 +621,27 @@ export default function Home() {
                 <span>
                   {chosen.trafficLights} mapped traffic-light encounters
                 </span>
-                <span>
-                  {(chosen.repeat * 100).toFixed(1)}% repeated distance
-                </span>
-                <span>{Math.round(chosen.paths * 100)}% paths & tracks</span>
-                <span>
-                  Loop heads{" "}
-                  {directions[1 + (Math.round(chosen.bearing / 45) % 8)]}
-                </span>
+                <span>{chosen.crossings} mapped crossing sections</span>
               </div>
               {result.routes.length > 1 && (
-                <div className="alternatives">
-                  {result.routes.map((r, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      aria-pressed={i === selected}
-                      onClick={() => setSelected(i)}
-                    >
-                      {i === 0 ? "Best" : `Loop ${i + 1}`} ·{" "}
-                      {(r.distance / 1000).toFixed(1)} km
-                    </Button>
-                  ))}
-                </div>
+                <details className="alternative-options">
+                  <summary>
+                    Compare {result.routes.length - 1} alternatives
+                  </summary>
+                  <div className="alternatives">
+                    {result.routes.map((r, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        aria-pressed={i === selected}
+                        onClick={() => setSelected(i)}
+                      >
+                        {i === 0 ? "Best" : `Loop ${i + 1}`} ·{" "}
+                        {(r.distance / 1000).toFixed(1)} km
+                      </Button>
+                    ))}
+                  </div>
+                </details>
               )}
               <Button
                 className="export-button"
@@ -654,15 +653,33 @@ export default function Home() {
               <details className="recommendation-details">
                 <summary>Why this loop?</summary>
                 <p>
-                  We favor mapped parks, gardens and woodland, and penalize
-                  traffic lights and repeated paths. Distance and your preferred
-                  direction also influence the ranking. This is the best
-                  candidate found in the searched area.
+                  We favor mapped parks and fewer interruptions: traffic lights,
+                  road and railway crossings, gates, stairs, and sharp turns.
+                  Distance, repeated paths and direction also affect the choice.
+                  This is the best candidate found, not a guaranteed stop-free
+                  route.
                 </p>
+                <div className="route-facts detail-facts">
+                  <span>
+                    {(chosen.repeat * 100).toFixed(1)}% repeated distance
+                  </span>
+                  <span>{Math.round(chosen.paths * 100)}% paths & tracks</span>
+                  <span>
+                    Loop heads{" "}
+                    {directions[1 + (Math.round(chosen.bearing / 45) % 8)]}
+                  </span>
+                  <span>{chosen.barriers} mapped barriers</span>
+                  <span>
+                    {chosen.railwayCrossings} mapped railway crossings
+                  </span>
+                  <span>{Math.round(chosen.steps)} m of stairs</span>
+                  <span>{chosen.sharpTurns} sharp junction turns</span>
+                </div>
                 <p>
                   Green-space coverage comes from mapped boundaries; unmapped
-                  parks or signals cannot be counted. A traffic light may be
-                  unavoidable to complete the loop.
+                  obstacles cannot be counted. Adjacent crossing markings are
+                  grouped into sections; these are not predicted stops or
+                  waiting times.
                 </p>
               </details>
               <p className="route-note">

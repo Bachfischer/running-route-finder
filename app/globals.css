@@ -945,3 +945,60 @@ a {
     min-height: 420px;
   }
 }
+
+/* Keep the primary flow to start, distance and one action. */
+.project-heading {
+  margin-top: 20px;
+  margin-bottom: 18px;
+}
+.project-heading h1 {
+  margin-bottom: 8px;
+}
+.intro {
+  margin-bottom: 18px;
+}
+.direction-options {
+  margin: 18px 0 8px;
+  font-size: 14px;
+}
+.direction-options summary,
+.alternative-options summary {
+  cursor: pointer;
+  padding: 10px 0;
+  min-height: 44px;
+}
+.direction-options .field-label {
+  margin-top: 12px;
+}
+.direction-options select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #b6bec2;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font: inherit;
+  background: #fff;
+  color: #494e52;
+}
+.alternative-options {
+  margin: 12px 0;
+  font-size: 14px;
+}
+.detail-facts {
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .project-heading {
+    margin: 16px 0;
+  }
+  .sidebar {
+    padding: 18px;
+  }
+  .site-masthead-inner {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .site-masthead nav {
+    margin-top: 10px;
+  }
+}

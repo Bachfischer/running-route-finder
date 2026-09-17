@@ -47,13 +47,12 @@ test("initial state has no fabricated route and requires a start", async ({
 });
 test("Munich example sets start, 10 km and north", async ({ page }) => {
   await choose(page);
-  await expect(page.getByLabel("01 Starting point")).toHaveValue(
+  await expect(page.getByLabel("Starting point")).toHaveValue(
     "Odeonsplatz, Munich",
   );
-  await expect(page.getByLabel("02 Target distance")).toHaveValue("10");
-  await expect(
-    page.getByRole("button", { name: "N", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Target distance")).toHaveValue("10");
+  await page.getByText("Direction: N", { exact: true }).click();
+  await expect(page.getByLabel("Preferred direction")).toHaveValue("N");
   await expect(
     page.getByRole("button", { name: "Find my loop", exact: true }),
   ).toBeEnabled();
@@ -63,7 +62,7 @@ for (const value of ["", "1", "26"])
     page,
   }) => {
     await choose(page);
-    await page.getByLabel("02 Target distance").fill(value);
+    await page.getByLabel("Target distance").fill(value);
     await expect(
       page.getByRole("button", { name: "Find my loop", exact: true }),
     ).toBeDisabled();
@@ -72,19 +71,19 @@ for (const value of ["", "1", "26"])
     ).toBeVisible();
   });
 test("distance controls clamp to supported range", async ({ page }) => {
-  await page.getByLabel("02 Target distance").fill("25");
+  await page.getByLabel("Target distance").fill("25");
   await page.getByRole("button", { name: "Increase distance" }).click();
-  await expect(page.getByLabel("02 Target distance")).toHaveValue("25");
-  await page.getByLabel("02 Target distance").fill("2");
+  await expect(page.getByLabel("Target distance")).toHaveValue("25");
+  await page.getByLabel("Target distance").fill("2");
   await page.getByRole("button", { name: "Decrease distance" }).click();
-  await expect(page.getByLabel("02 Target distance")).toHaveValue("2");
+  await expect(page.getByLabel("Target distance")).toHaveValue("2");
 });
 test("coordinate lookup works through the real Worker API using keyboard", async ({
   page,
 }) => {
-  await page.getByLabel("01 Starting point").fill("48.142,11.577");
-  await page.getByLabel("01 Starting point").press("Enter");
-  await page.locator(".places button").click();
+  await page.getByLabel("Starting point").fill("48.142,11.577");
+  await page.getByLabel("Starting point").press("Enter");
+  await expect(page.getByText(/Start selected/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Find my loop", exact: true }),
   ).toBeEnabled();
@@ -127,13 +126,13 @@ test("request carries selected inputs and prevents edits while loading", async (
   });
   await choose(page);
   await page.getByRole("button", { name: "Find my loop", exact: true }).click();
-  await expect(page.getByLabel("01 Starting point")).toBeDisabled();
+  await expect(page.getByLabel("Starting point")).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Finding your loop…" }),
   ).toBeDisabled();
   release();
   await expect(page.getByLabel("Route recommendation")).toBeVisible();
-  await expect(page.getByLabel("01 Starting point")).toBeEnabled();
+  await expect(page.getByLabel("Starting point")).toBeEnabled();
 });
 test("provider failure is accessible and a retry can succeed", async ({
   page,
@@ -156,17 +155,17 @@ test("network failure releases controls", async ({ page }) => {
   await choose(page);
   await page.getByRole("button", { name: "Find my loop", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
-  await expect(page.getByLabel("01 Starting point")).toBeEnabled();
+  await expect(page.getByLabel("Starting point")).toBeEnabled();
 });
 test("editing a start clears the previous recommendation", async ({ page }) => {
   await mockRoutes(page);
   await choose(page);
   await find(page);
-  await page.getByLabel("01 Starting point").fill("Berlin");
+  await page.getByLabel("Starting point").fill("Berlin");
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Find my loop", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
 });
 test("changing distance or direction clears stale results", async ({
   page,
@@ -177,7 +176,8 @@ test("changing distance or direction clears stale results", async ({
   await page.getByRole("button", { name: "5 km", exact: true }).click();
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
   await find(page);
-  await page.getByRole("button", { name: "S", exact: true }).click();
+  await page.getByText("Direction: N", { exact: true }).click();
+  await page.getByLabel("Preferred direction").selectOption("S");
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
 });
 test("alternatives update selection and GPX exports the selected coordinates", async ({
@@ -186,6 +186,7 @@ test("alternatives update selection and GPX exports the selected coordinates", a
   await mockRoutes(page);
   await choose(page);
   await find(page);
+  await page.getByText(/Compare .* alternatives/).click();
   await page.getByRole("button", { name: /Loop 2 ·/ }).click();
   await expect(page.getByText("ALTERNATIVE LOOP")).toBeVisible();
   const download = page.waitForEvent("download");
@@ -287,3 +288,58 @@ for (const name of ["Running route finder", "Launch route finder"]) {
     }
   });
 }
+
+test("default setup keeps optional direction out of the primary form", async ({
+  page,
+}) => {
+  await expect(page.getByLabel("Target distance")).toHaveValue("10");
+  await expect(page.getByLabel("Preferred direction")).toBeHidden();
+  await page.getByText("Direction: best available", { exact: true }).click();
+  await expect(page.getByLabel("Preferred direction")).toBeVisible();
+});
+test("one matching address needs only the find button", async ({ page }) => {
+  await mockRoutes(page);
+  await page.route("**/api/search?**", (route) =>
+    route.fulfill({
+      json: {
+        places: [{ lat: 48.142, lon: 11.577, name: "Odeonsplatz, Munich" }],
+      },
+    }),
+  );
+  await page.getByLabel("Starting point").fill("Odeonsplatz Munich");
+  await find(page);
+  await expect(page.getByLabel("Starting point")).toHaveValue(
+    "Odeonsplatz, Munich",
+  );
+  await expect(page.locator(".places")).toHaveCount(0);
+});
+test("ambiguous addresses require a deliberate location choice", async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route("**/api/loops", (route) => {
+    calls++;
+    return route.fulfill({ json: result });
+  });
+  await page.route("**/api/search?**", (route) =>
+    route.fulfill({
+      json: {
+        places: [
+          { lat: 48.142, lon: 11.577, name: "Munich center" },
+          { lat: 48.2, lon: 11.6, name: "Munich north" },
+        ],
+      },
+    }),
+  );
+  await page.getByLabel("Starting point").fill("Munich");
+  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Munich center", exact: true }),
+  ).toBeVisible();
+  expect(calls).toBe(0);
+  await page
+    .getByRole("button", { name: "Munich center", exact: true })
+    .click();
+  await find(page);
+  expect(calls).toBe(1);
+});
