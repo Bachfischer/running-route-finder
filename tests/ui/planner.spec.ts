@@ -78,7 +78,7 @@ test("distance controls clamp to supported range", async ({ page }) => {
   await page.getByRole("button", { name: "Decrease distance" }).click();
   await expect(page.getByLabel("Target distance")).toHaveValue("2");
 });
-test("coordinate lookup works through the real Worker API using keyboard", async ({
+test("coordinate lookup works through the real Node.js API using keyboard", async ({
   page,
 }) => {
   await page.getByLabel("Starting point").fill("48.142,11.577");
@@ -145,16 +145,18 @@ test("provider failure is accessible and a retry can succeed", async ({
   );
   await choose(page);
   await page.getByRole("button", { name: "Find my loop", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("map service is busy");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "map service is busy",
+  );
   await mockRoutes(page);
   await find(page);
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
 });
 test("network failure releases controls", async ({ page }) => {
   await page.route("**/api/loops", (route) => route.abort());
   await choose(page);
   await page.getByRole("button", { name: "Find my loop", exact: true }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   await expect(page.getByLabel("Starting point")).toBeEnabled();
 });
 test("editing a start clears the previous recommendation", async ({ page }) => {

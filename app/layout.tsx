@@ -5,9 +5,6 @@ export const metadata: Metadata = {
   title: "Running route finder — Matthias Bachfischer",
   description:
     "Find a running loop from any starting point. Choose your distance and direction, explore mapped paths, and download a GPX route.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

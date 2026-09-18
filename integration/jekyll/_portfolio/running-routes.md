@@ -20,7 +20,7 @@ Pick a starting point, choose how far you want to run, and explore a direction. 
 
 Nearby streets and trails become a graph with mapped pedestrian access. A* search connects candidate waypoints into loops. Candidates are ranked by distance accuracy, direction, and backtracking, with a small preference for paths and tracks.
 
-The interface and route search run on Cloudflare Workers. Photon provides location search; Overpass provides OpenStreetMap data. No LLM is needed to calculate a route.
+The interface and route search run on Next.js on Vercel. Photon provides location search; Overpass provides OpenStreetMap data. No LLM is needed to calculate a route.
 
 ## Things to know
 

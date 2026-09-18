@@ -48,3 +48,5 @@ wrangler.deploy.json
 
 /playwright-report/
 /test-results/
+
+.vercel/

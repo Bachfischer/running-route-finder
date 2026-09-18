@@ -75,13 +75,7 @@ export async function jsonFetch(
 export function createCooldown(now: () => number = Date.now) {
   const recent = new Map<string, number>();
   return (req: Request, kind: string, ms: number) => {
-    const key =
-      kind +
-      ":" +
-      (req.headers.get("cf-connecting-ip") ||
-        req.headers.get("oai-authenticated-user-id") ||
-        req.headers.get("x-real-ip") ||
-        "local");
+    const key = kind + ":" + (req.headers.get("x-real-ip") || "local");
     const time = now();
     if ((recent.get(key) || 0) > time) return true;
     if (recent.size >= 1000) {

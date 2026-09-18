@@ -17,7 +17,7 @@
    ignore:
      envs: development
 +
-+# Set this to the independent Worker URL after deployment, e.g. https://run.bachfischer.me
++# Set this to the independent Vercel app URL after deployment, e.g. https://run.bachfischer.me
 +running_routes_url: ""
 --- /dev/null
 +++ b/_pages/projects.html
@@ -62,7 +62,7 @@
 +
 +Nearby streets and trails become a graph with mapped pedestrian access. A* search connects candidate waypoints into loops. Candidates are ranked by distance accuracy, direction, and backtracking, with a small preference for paths and tracks.
 +
-+The interface and route search run on Cloudflare Workers. Photon provides location search; Overpass provides OpenStreetMap data. No LLM is needed to calculate a route.
++The interface and route search run on Next.js on Vercel. Photon provides location search; Overpass provides OpenStreetMap data. No LLM is needed to calculate a route.
 +
 +## Things to know
 +

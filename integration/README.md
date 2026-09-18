@@ -6,9 +6,9 @@ Prepared against the website's main HEAD `738c885f495c416196aaf97be4666cb74d3f45
 
 - `bachfischer.me/projects/`: project index with the existing author sidebar and archive-list styling.
 - `bachfischer.me/projects/running-routes/`: normal Jekyll project article, with explanation, limitations, and a launch button.
-- `run.bachfischer.me`: proposed independent Cloudflare Worker custom domain for the live tool, with the same masthead, font stack, gray palette, and cyan accents. This domain is a proposal, not an active deployment.
+- `run.bachfischer.me`: proposed independent Vercel custom domain for the live tool, with the same masthead, font stack, gray palette, and cyan accents. This domain is a proposal, not an active deployment.
 
-Your `_config.yml` already declares an output-enabled `portfolio` collection with a `single` layout default. This proposal reuses it and overrides this entry's permalink. There is no extra Jekyll plugin, theme change, or new collection. Projects is inserted after Blog in `_data/navigation.yml`; all other entries stay in place. A separate Worker keeps the current GitHub Pages build intact.
+Your `_config.yml` already declares an output-enabled `portfolio` collection with a `single` layout default. This proposal reuses it and overrides this entry's permalink. There is no extra Jekyll plugin, theme change, or new collection. Projects is inserted after Blog in `_data/navigation.yml`; all other entries stay in place. A separate deployment keeps the current GitHub Pages build intact.
 
 The app's `/projects/` page provides a working visual example of the new index. The app home is the route finder. The standalone masthead links Blog, Publications, CV, Reading List, Languages, and Life back to their current website URLs.
 
@@ -21,15 +21,15 @@ git apply --check /path/to/website-projects.patch
 git apply /path/to/website-projects.patch
 ```
 
-The patch adds the Projects navigation item, the index, the portfolio entry, and an empty `running_routes_url` setting. After independently deploying the Worker, set that value in `_config.yml` to its actual HTTPS address. The launch button is hidden until a URL is configured. Run your existing Jekyll build, review, and publish through your normal GitHub Pages flow. If the website has changed since the source revision above, inspect the patch before applying it.
+The patch adds the Projects navigation item, the index, the portfolio entry, and an empty `running_routes_url` setting. After independently deploying the app, set that value in `_config.yml` to its actual HTTPS address. The launch button is hidden until a URL is configured. Run your existing Jekyll build, review, and publish through your normal GitHub Pages flow. If the website has changed since the source revision above, inspect the patch before applying it.
 
-Deploy the independent Worker using the main README. To add `run.bachfischer.me`, your domain must be available in your Cloudflare account; add a Workers Custom Domain after deployment. Until then, the Worker-provided URL works. Update the app's Projects navigation link to `https://bachfischer.me/projects/` after the Jekyll page is live if you prefer the canonical blog index.
+Deploy the independent Vercel app using the main README. To add `run.bachfischer.me`, add the domain in Vercel Project Settings → Domains and apply the DNS record Vercel provides. Until then, the vercel.app URL works. Update the app's Projects navigation link to `https://bachfischer.me/projects/` after the Jekyll page is live if you prefer the canonical blog index.
 
 ## Optional inline embed
 
 The main recommendation is a project page plus launch button. If you prefer to keep the tool inside the article, the app also supports `?embed=1`: this omits the duplicate masthead, page introduction, and footer.
 
-After configuring the public Worker URL, this can be added to the portfolio page:
+After configuring the public app URL, this can be added to the portfolio page:
 
 ```html
 {% if site.running_routes_url and site.running_routes_url != "" %}

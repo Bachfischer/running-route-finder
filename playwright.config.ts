@@ -19,8 +19,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      "pnpm exec wrangler dev --local --config wrangler.deploy.json --ip 127.0.0.1 --port 8787 --inspector-port 0",
+    command: "pnpm start --hostname 127.0.0.1 --port 8787",
     url: "http://127.0.0.1:8787",
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
