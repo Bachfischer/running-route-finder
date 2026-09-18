@@ -7,7 +7,11 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 const store =
   process.env.VERCEL === "1"
-    ? getCache({ namespace: "bachfischer-running-routes-map-v1" })
+    ? getCache({
+        namespace: "bachfischer-running-routes-map-v1",
+        // Preserve the SHA-256 key instead of the SDK's default 32-bit hash.
+        keyHashFunction: (key) => key,
+      })
     : memoryMapStore();
 const load = cachedAreaLoader(store);
 const handlers = createHandlers({
