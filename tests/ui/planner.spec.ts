@@ -78,7 +78,7 @@ test("distance controls clamp to supported range", async ({ page }) => {
   await page.getByRole("button", { name: "Decrease distance" }).click();
   await expect(page.getByLabel("Target distance")).toHaveValue("2");
 });
-test("coordinate lookup works through the real Worker API using keyboard", async ({
+test("coordinate lookup works through the real Node.js API using keyboard", async ({
   page,
 }) => {
   await page.getByLabel("Starting point").fill("48.142,11.577");

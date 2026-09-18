@@ -37,7 +37,7 @@ export function routeRequest(
 ) {
   return new Request("https://loop.test/api/loops", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "cf-connecting-ip": ip },
+    headers: { "Content-Type": "application/json", "x-real-ip": ip },
     body: JSON.stringify(body),
   });
 }

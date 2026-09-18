@@ -24,23 +24,9 @@ jobs:
       - run: pnpm check
       - run: pnpm test:memory
       - run: pnpm build
-      - run: pnpm test:worker
-      - run: node scripts/cloudflare-config.mjs
-        env:
-          WORKER_NAME: ${{ vars.WORKER_NAME }}
-          PHOTON_URL: ${{ vars.PHOTON_URL }}
-          OVERPASS_URL: ${{ vars.OVERPASS_URL }}
+      - run: pnpm test:server
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
-      - run: pnpm exec wrangler deploy --dry-run --config wrangler.deploy.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cloudflare-build-${{ github.sha }}
-          path: |
-            dist/
-            wrangler.deploy.json
-          include-hidden-files: true
-          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -50,35 +36,3 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
-
-  deploy-cloudflare:
-    name: Deploy Cloudflare production
-    needs: quality
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: production
-    concurrency:
-      group: cloudflare-production
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-      - uses: pnpm/action-setup@v4
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
-        with:
-          name: cloudflare-build-${{ github.sha }}
-      - name: Deploy the tested artifact
-        run: pnpm exec wrangler deploy --config wrangler.deploy.json
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Smoke-check production
-        if: vars.APP_URL != ''
-        run: pnpm test:deployment "$APP_URL"
-        env:
-          APP_URL: ${{ vars.APP_URL }}

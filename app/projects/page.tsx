@@ -1,4 +1,4 @@
-/* Standard document navigation avoids the Vinext Link hydration failure on touch devices. */
+/* Standard document navigation supports touch devices and visitors without JavaScript. */
 /* eslint-disable @next/next/no-html-link-for-pages */
 import Image from "next/image";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
@@ -45,7 +45,7 @@ export default function Projects() {
             <div className="project-tags">
               <span>OpenStreetMap</span>
               <span>Graph search</span>
-              <span>Cloudflare Workers</span>
+              <span>Next.js · Vercel</span>
             </div>
             <a className="project-launch" href="/">
               Launch route finder

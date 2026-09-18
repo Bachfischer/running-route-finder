@@ -39,7 +39,7 @@ node(w.ways)->.nodes;
 (.nodes; - .restrictions;);out skel qt;
 (nwr(around:${Math.round(area.radius)},${lat.toFixed(6)},${lon.toFixed(6)})[leisure~"^(park|garden|nature_reserve)$"];nwr(around:${Math.round(area.radius)},${lat.toFixed(6)},${lon.toFixed(6)})[landuse~"^(forest|recreation_ground)$"];);out geom qt;`;
 }
-function elementsFrom(data: unknown): OSMElement[] {
+export function elementsFrom(data: unknown): OSMElement[] {
   if (!data || typeof data !== "object")
     throw new ProviderError("The map service returned invalid data.");
   const d = data as { remark?: unknown; elements?: unknown };

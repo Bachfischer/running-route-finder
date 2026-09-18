@@ -1,6 +1,6 @@
 # Running route finder
 
-A park-focused running-loop planner for Cloudflare Workers. Choose a start, 2–25 km, and a direction; compare loops, see green-space and traffic-light estimates, and download the displayed route as GPX. React/Vinext, Leaflet and OpenStreetMap; no LLM, database or routing API key.
+A park-focused running-loop planner on Next.js and Vercel. Choose a start, 2–25 km, and a direction; compare loops, see green-space and traffic-light estimates, and download the displayed route as GPX. React/Next.js, Leaflet and OpenStreetMap; no LLM, database or routing API key.
 
 ## Local development
 
@@ -20,14 +20,12 @@ Open the URL printed by the development server. The Munich example selects Odeon
 pnpm check
 pnpm test:memory
 pnpm build
-pnpm test:worker
-node scripts/cloudflare-config.mjs
+pnpm test:server
 pnpm exec playwright install --with-deps chromium
 pnpm test:ui
-pnpm exec wrangler deploy --dry-run --config wrangler.deploy.json
 ```
 
-`pnpm check` runs formatting, ESLint, TypeScript, and Node unit/API/regression tests with coverage gates (90% lines/functions; 80% branches). `test:worker` executes the compiled production bundle in Cloudflare's workerd runtime with recorded Overpass data. Playwright runs the UI scenarios at desktop and mobile sizes against the compiled local Worker. Public tile and routing requests are intercepted in those UI tests; coordinate lookup exercises the actual API. Tests do not need provider availability or Cloudflare credentials.
+`pnpm check` runs formatting, ESLint, TypeScript, and Node unit/API/regression tests with coverage gates (90% lines/functions; 80% branches). `test:server` exercises a real compiled Next.js server with recorded Overpass data, including repeated-search caching. Playwright runs the UI scenarios at desktop and mobile sizes against the compiled Node.js server. Public tile and routing requests are intercepted in those UI tests; coordinate lookup exercises the actual API. Tests do not need provider availability or Vercel credentials.
 
 The real Munich OSM fixture includes park polygons and signal tags. Assertions require a closed loop within 500 m of 10 km, over 70% mapped green spaces, over 90% paths/tracks, under 5% repeat, and no mapped signal encounters. Access restrictions, barriers, pedestrian one-way rules, disconnected graphs, dense-area retries, response streaming limits, rate limits and provider failures have independent tests. See [testing details](docs/TESTING.md).
 
@@ -37,22 +35,17 @@ Optional live check, deliberately excluded from normal CI to avoid repeatedly hi
 pnpm test:live
 ```
 
-## Cloudflare deployment
+## Vercel deployment
 
-Use a separate Worker repository and GitHub Actions, keeping the existing Jekyll/GitHub Pages site. Read [the deployment and CI guide](docs/CLOUDFLARE.md) for the exact secrets, variables, custom domain, branch protection and rollback steps.
+Import this repository into Vercel as a Next.js project using Node 24. Pull requests receive preview deployments; `main` is production. `vercel.json` selects Frankfurt and runs core checks before building. Require **Quality and routing regressions** before merging, since the full browser suite runs in GitHub Actions. Vercel Git deployment does not wait for unrelated Actions jobs.
 
-For the first deployment from your machine:
+See [the deployment and CI guide](docs/VERCEL.md) for the initial import, custom domain, branch protection and rollback. No GitHub deployment token or database is needed. The existing Jekyll/GitHub Pages site stays in its own repository.
 
-```sh
-pnpm install --frozen-lockfile
-pnpm check
-pnpm build
-pnpm test:worker
-pnpm exec wrangler login
-pnpm deploy:cloudflare
-```
+## Map cache
 
-Workers Paid is recommended: routing exceeds the Free plan's CPU allowance. The generated config uses a 30-second CPU ceiling and serves UI assets and API from one Worker. No database or storage bindings are required. A deployment in your own account is independent of the private Sites copy and is public unless you separately configure Access.
+Validated Overpass areas are gzip-compressed and cached for 15 minutes using Vercel Runtime Cache. Exact queries share downloads across function instances in the same region/environment; different areas and providers have separate keys. The app caps entries below the platform's 2 MB limit, bounds decompression to 18 MB, and treats unavailable, corrupt or expired cache entries as misses. Cache operations have a 250 ms budget each. Oversized areas remain usable without caching.
+
+Local Node.js uses a bounded four-entry memory cache. Route graphs and recommendations are recalculated, so this reduces provider traffic but does not remove CPU work. Only public map data is cached; keys hash the query/provider and values contain map geometry, not user identities or saved runs. Eviction can happen before expiry. This is not an offline-routing guarantee.
 
 ## How recommendations work
 
@@ -76,12 +69,12 @@ On the refreshed 2026-09-15 Odeonsplatz extract, the 10 km recommendation is **1
 - Overpass paths, green boundaries and signals: `OVERPASS_URL`, default `https://overpass-api.de/api/interpreter`. Streamed 18 MB response cap; 130,000-element graph cap; per-query timeout up to 40 seconds.
 - OSM map tiles through locally bundled Leaflet; visible attribution. Tile requests reveal the viewed map area to the tile provider.
 
-Coordinates go to Overpass; typed address searches go to Photon. There is no application location-history database. Provider URLs can be configured using environment variables when generating the Cloudflare config; both must be HTTPS and preserve the expected API format. Do not put credentials into URLs. Isolate-local cooldowns and one routing job per isolate limit pressure, but are not distributed abuse protection. Configure edge rate limiting and a managed/self-hosted provider before broad public use. Public endpoints can throttle and have no uptime guarantee.
+Coordinates go to Overpass; typed address searches go to Photon. There is no application location-history database. Provider URLs can be configured using environment variables in Vercel project settings; both must be HTTPS and preserve the expected API format. Do not put credentials into URLs. Instance-local cooldowns and one routing job per instance limit pressure, but are not distributed abuse protection. Configure edge rate limiting and a managed/self-hosted provider before broad public use. Public endpoints can throttle and have no uptime guarantee.
 
 See [Photon usage](https://github.com/komoot/photon#demo-server), [Overpass resource guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html), and [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
 
 ## Website integration
 
-Use `bachfischer.me/projects/running-routes/` as a Jekyll project article linking to the proposed `run.bachfischer.me` Worker. The app follows the existing AcademicPages typography and gray/cyan palette. `/projects/` is a visual example; `?embed=1` hides surrounding chrome for an optional iframe. See [the integration proposal](integration/README.md) and [reviewable Jekyll patch](integration/website-projects.patch). The original website repository and proposed custom domain have not been changed.
+Use `bachfischer.me/projects/running-routes/` as a Jekyll project article linking to the proposed `run.bachfischer.me` Vercel app. The app follows the existing AcademicPages typography and gray/cyan palette. `/projects/` is a visual example; `?embed=1` hides surrounding chrome for an optional iframe. See [the integration proposal](integration/README.md) and [reviewable Jekyll patch](integration/website-projects.patch). The original website repository and proposed custom domain have not been changed.
 
 Inspired by [Simon Willison's running-route experiment](https://simonwillison.net/2026/Sep/12/astra-running-routes/). Map data © OpenStreetMap contributors, ODbL; fixture attribution is in `tests/fixtures/README.md`.
