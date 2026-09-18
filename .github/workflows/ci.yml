@@ -27,7 +27,7 @@ jobs:
       - run: pnpm test:server
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-reports-${{ github.sha }}
