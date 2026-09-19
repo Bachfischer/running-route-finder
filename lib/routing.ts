@@ -1,6 +1,6 @@
 import { interruptions, type Interruptions } from "./interruptions.ts";
 import { greenAreas, inGreenArea, isTrafficSignal } from "./scenery.ts";
-import { MapCapacityError, RouteError } from "./errors.ts";
+import { MapCapacityError, RouteError, ProviderError } from "./errors.ts";
 export type Coord = [number, number];
 export type OSMElement = {
   type: string;
@@ -542,7 +542,10 @@ export function findLoops(
   start: Coord,
   target: number,
   direction: string,
+  deadline = Infinity,
 ): LoopResult {
+  if (Date.now() >= deadline)
+    throw new ProviderError("The route search timed out. Please try again.");
   if (
     !Array.isArray(start) ||
     start.length !== 2 ||
@@ -594,9 +597,17 @@ export function findLoops(
           preferred + 50,
           preferred + 180,
         ];
-  for (const scale of [0.65, 0.75, 0.85, 0.95, 1.05, 1.15])
+  candidates: for (const scale of [0.65, 0.75, 0.85, 0.95, 1.05, 1.15])
     for (const bearing of bearings)
       for (const spread of [15, 35]) {
+        // Timers cannot interrupt synchronous graph work; check wall-clock time
+        // between candidates and retain any valid loops already discovered.
+        if (Date.now() >= deadline) {
+          if (routes.length) break candidates;
+          throw new ProviderError(
+            "The route search timed out. Please try again.",
+          );
+        }
         const radius = (target / 3.9) * scale;
         const a = nearest(g, destination(origin, radius, bearing - spread)),
           b = nearest(g, destination(origin, radius, bearing + spread));

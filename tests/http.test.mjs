@@ -55,7 +55,11 @@ for (const body of ["{", "x".repeat(1501), "null"])
     assert.equal(
       (
         await h.loops(
-          new Request("https://test/api/loops", { method: "POST", body }),
+          new Request("https://test/api/loops", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+          }),
         )
       ).status,
       400,
@@ -130,7 +134,7 @@ test("coordinate search requires no external call", async () => {
     name: "48.14000, 11.58000",
   });
 });
-test("Photon results have validated coordinates, deduplicated labels and private cache", async () => {
+test("Photon results have validated coordinates, deduplicated labels and no-store", async () => {
   let seen;
   const h = createHandlers({
     fetcher: async (u) => {
@@ -151,7 +155,7 @@ test("Photon results have validated coordinates, deduplicated labels and private
     new Request("https://test/api/search?q=Munich%20%26%20park"),
   );
   assert.equal(seen.searchParams.get("q"), "Munich & park");
-  assert.equal(res.headers.get("Cache-Control"), "private, max-age=86400");
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
   assert.deepEqual((await res.json()).places, [
     { lat: 48.14, lon: 11.58, name: "Munich, Germany" },
     { lat: 2, lon: 1, name: "Unnamed location" },

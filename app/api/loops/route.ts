@@ -2,6 +2,7 @@ import { getCache } from "@vercel/functions";
 import { createHandlers } from "../../../lib/http.ts";
 import { cachedAreaLoader, memoryMapStore } from "../../../lib/map-cache.ts";
 import { searchLoops } from "../../../lib/route-search.ts";
+import { observed } from "../../../lib/observability.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -15,6 +16,6 @@ const store =
     : memoryMapStore();
 const load = cachedAreaLoader(store);
 const handlers = createHandlers({
-  search: (input) => searchLoops(input, load),
+  search: (input, signal) => searchLoops(input, load, Date.now, signal),
 });
-export const POST = handlers.loops;
+export const POST = observed("loops", handlers.loops);

@@ -127,7 +127,7 @@ test("deadline stops further requests", async () => {
       },
       () => (n ? 200000 : 0),
     ),
-    RouteError,
+    ProviderError,
   );
   assert.equal(n, 1);
 });

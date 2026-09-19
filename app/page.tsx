@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { toGpx } from "@/lib/gpx";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import type { LoopResult } from "@/lib/routing";
+import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
 const directions = ["Any", "N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export default function Home() {
@@ -48,6 +49,8 @@ export default function Home() {
     layerRef = useRef<LayerGroup | null>(null),
     host = useRef<HTMLDivElement>(null),
     request = useRef(0),
+    searchController = useRef<AbortController | null>(null),
+    routeController = useRef<AbortController | null>(null),
     busyRef = useRef(false),
     leaflet = useRef<typeof import("leaflet") | null>(null),
     resultsRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,7 @@ export default function Home() {
         map.on("click", (e: LeafletMouseEvent) => {
           if (busyRef.current) return;
           request.current++;
+          searchController.current?.abort();
           setPlace({
             lat: e.latlng.lat,
             lon: e.latlng.lng,
@@ -90,6 +94,12 @@ export default function Home() {
         if (alive) setMapError(true);
       });
     return () => {
+      // This is a request sequence counter, not a DOM ref; invalidate every
+      // pending response when the component unmounts.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      request.current++;
+      searchController.current?.abort();
+      routeController.current?.abort();
       alive = false;
       instance?.remove();
       if (mapRef.current === instance) {
@@ -146,14 +156,30 @@ export default function Home() {
   }, [result]);
   async function search() {
     if (query.trim().length < 3) return;
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
     const id = ++request.current;
     setSearching(true);
     setError("");
     try {
-      const res = await fetch("/api/search?q=" + encodeURIComponent(query));
-      const data = (await res.json()) as { places: Place[]; error?: string };
+      const data = await requestJson<{ places: Place[] }>(
+        "/api/search?q=" + encodeURIComponent(query),
+        { signal: controller.signal },
+      );
       if (id !== request.current) return;
-      if (!res.ok) throw Error(data.error);
+      if (
+        !Array.isArray(data.places) ||
+        !data.places.every(
+          (p) =>
+            typeof p?.name === "string" &&
+            Number.isFinite(p.lat) &&
+            Number.isFinite(p.lon),
+        )
+      )
+        throw Error(
+          "The location service returned invalid data. Please try again.",
+        );
       if (data.places.length === 1) {
         const match = data.places[0];
         setPlace(match);
@@ -168,7 +194,8 @@ export default function Home() {
           "No locations found. Try a city and street, or pin a point on the map.",
         );
     } catch (e) {
-      if (id === request.current) setError((e as Error).message);
+      if (id === request.current && !controller.signal.aborted)
+        setError((e as Error).message);
     } finally {
       if (id === request.current) setSearching(false);
     }
@@ -208,27 +235,66 @@ export default function Home() {
     );
   }
   async function find() {
+    if (busyRef.current) return;
     const start = place ?? (await search());
-    if (!start) return;
+    if (!start || busyRef.current) return;
+    const controller = new AbortController();
+    routeController.current = controller;
     busyRef.current = true;
     setBusy(true);
     setError("");
     setResult(null);
     try {
-      const res = await fetch("/api/loops", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...start,
-          distance: Number(distance),
-          direction,
-        }),
-      });
-      const data = (await res.json()) as LoopResult & { error?: string };
-      if (!res.ok) throw Error(data.error);
+      const data = await requestJson<LoopResult>(
+        "/api/loops",
+        {
+          signal: controller.signal,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...start,
+            distance: Number(distance),
+            direction,
+          }),
+        },
+        150000,
+      );
+      if (controller.signal.aborted) return;
+      if (
+        !Array.isArray(data.routes) ||
+        !data.routes.length ||
+        data.routes.some(
+          (r) =>
+            !Number.isFinite(r.distance) ||
+            !Array.isArray(r.coordinates) ||
+            r.coordinates.length < 2 ||
+            !r.coordinates.every(
+              (c) =>
+                Array.isArray(c) &&
+                c.length === 2 &&
+                c.every(Number.isFinite) &&
+                Math.abs(c[0]) <= 180 &&
+                Math.abs(c[1]) <= 85,
+            ) ||
+            ![
+              r.parks,
+              r.paths,
+              r.repeat,
+              r.steps,
+              r.trafficLights,
+              r.crossings,
+              r.barriers,
+              r.railwayCrossings,
+            ].every(Number.isFinite),
+        )
+      )
+        throw Error(
+          "The route service returned invalid data. Please try again.",
+        );
       setResult(data);
       setSelected(0);
     } catch (e) {
+      if (controller.signal.aborted) return;
       setError(
         (e as Error).message || "Could not find a route. Please try again.",
       );
@@ -286,6 +352,7 @@ export default function Home() {
                   value={query}
                   onChange={(e) => {
                     request.current++;
+                    searchController.current?.abort();
                     setSearching(false);
                     setError("");
                     setQuery(e.target.value);
@@ -316,6 +383,7 @@ export default function Home() {
                         variant="ghost"
                         onClick={() => {
                           request.current++;
+                          searchController.current?.abort();
                           setSearching(false);
                           setError("");
                           setPlace(p);
@@ -343,6 +411,7 @@ export default function Home() {
                 className="example-start"
                 onClick={() => {
                   request.current++;
+                  searchController.current?.abort();
                   setSearching(false);
                   setPlace({
                     lat: 48.142,
@@ -492,6 +561,19 @@ export default function Home() {
                 </>
               )}
             </Button>
+            {busy && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  routeController.current?.abort();
+                  setError(
+                    "Route search cancelled. You can change your start or distance and try again.",
+                  );
+                }}
+              >
+                Cancel search
+              </Button>
+            )}
             <div aria-live="polite">
               {result && (
                 <p className="sr-only">
