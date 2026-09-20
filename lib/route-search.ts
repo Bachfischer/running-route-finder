@@ -87,7 +87,9 @@ export async function searchLoops(
   input: RouteInput,
   load: AreaLoader = loadArea,
   now: () => number = Date.now,
+  signal?: AbortSignal,
 ): Promise<LoopResult> {
+  signal?.throwIfAborted();
   const start: Coord = [input.lon, input.lat],
     target = input.distance * 1000,
     deadline = now() + 110000;
@@ -99,15 +101,26 @@ export async function searchLoops(
   for (const original of areas) {
     let area = original;
     while (calls < 6) {
+      signal?.throwIfAborted();
       const remaining = deadline - now();
       if (remaining < 1000) break;
       calls++;
       try {
         const elements = await load(
           area,
-          AbortSignal.timeout(Math.min(40000, remaining)),
+          AbortSignal.any([
+            AbortSignal.timeout(Math.min(40000, remaining)),
+            ...(signal ? [signal] : []),
+          ]),
         );
-        const result = findLoops(elements, start, target, input.direction);
+        signal?.throwIfAborted();
+        const result = findLoops(
+          elements,
+          start,
+          target,
+          input.direction,
+          Date.now() + Math.max(0, deadline - now()),
+        );
         if (!best || result.routes[0].score < best.routes[0].score)
           best = result;
         // Keep the requested target unchanged even when the search footprint shrinks.
@@ -123,6 +136,7 @@ export async function searchLoops(
           return result;
         break;
       } catch (e) {
+        signal?.throwIfAborted();
         if (e instanceof MapCapacityError) {
           if (area.radius < 1000) break;
           const scale = 0.72;

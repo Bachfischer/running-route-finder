@@ -159,6 +159,63 @@ test("network failure releases controls", async ({ page }) => {
   await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   await expect(page.getByLabel("Starting point")).toBeEnabled();
 });
+
+test("a route search can be cancelled without accepting a late response", async ({
+  page,
+}) => {
+  let release!: () => void;
+  await page.route("**/api/loops", async (route) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await route.fulfill({ json: result }).catch(() => {});
+  });
+  await choose(page);
+  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Cancel search" }),
+  ).toBeVisible();
+  await expect.poll(() => typeof release).toBe("function");
+  await page.getByRole("button", { name: "Cancel search" }).click();
+  await expect(page.getByLabel("Starting point")).toBeEnabled();
+  release();
+  await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "cancelled",
+  );
+});
+
+test("gateway HTML errors release controls with a readable message", async ({
+  page,
+}) => {
+  await page.route("**/api/loops", (route) =>
+    route.fulfill({
+      status: 504,
+      contentType: "text/html",
+      body: "<h1>Gateway timeout</h1>",
+    }),
+  );
+  await choose(page);
+  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "incomplete response",
+  );
+  await expect(page.getByLabel("Starting point")).toBeEnabled();
+});
+
+test("malformed successful route responses do not crash the planner", async ({
+  page,
+}) => {
+  await page.route("**/api/loops", (route) =>
+    route.fulfill({ json: { routes: [] } }),
+  );
+  await choose(page);
+  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "invalid data",
+  );
+  await expect(page.getByLabel("Starting point")).toBeEnabled();
+});
 test("editing a start clears the previous recommendation", async ({ page }) => {
   await mockRoutes(page);
   await choose(page);

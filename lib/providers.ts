@@ -9,9 +9,15 @@ export function provider(name: string, fallback: string) {
 export async function readTextBounded(
   response: Response,
   maxBytes: number,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted();
   const reader = response.body?.getReader();
   if (!reader) throw new ProviderError("The map service returned empty data.");
+  const abort = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   try {
     if (Number(response.headers.get("content-length") || 0) > maxBytes)
       throw new MapCapacityError();
@@ -20,6 +26,7 @@ export async function readTextBounded(
       bytes = 0;
     while (true) {
       const { done, value } = await reader.read();
+      signal?.throwIfAborted();
       if (done) break;
       bytes += value.byteLength;
       if (bytes > maxBytes) throw new MapCapacityError();
@@ -27,6 +34,7 @@ export async function readTextBounded(
     }
     return text + decoder.decode();
   } finally {
+    signal?.removeEventListener("abort", abort);
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
@@ -38,13 +46,19 @@ export async function jsonFetch(
   fetcher: Fetcher = fetch,
 ): Promise<unknown> {
   let res: Response;
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(40000),
+    ...(init.signal ? [init.signal] : []),
+  ]);
   try {
     const headers = new Headers(init.headers);
     headers.set("User-Agent", "LoopRunningRouteFinder/1.1");
     headers.set("Accept", "application/json");
     res = await fetcher(url, {
       ...init,
-      signal: init.signal || AbortSignal.timeout(40000),
+      signal,
+      cache: "no-store",
+      redirect: "error",
       headers,
     });
   } catch (e) {
@@ -62,7 +76,7 @@ export async function jsonFetch(
     );
   }
   try {
-    return JSON.parse(await readTextBounded(res, maxBytes));
+    return JSON.parse(await readTextBounded(res, maxBytes, signal));
   } catch (e) {
     if (e instanceof MapCapacityError || e instanceof ProviderError) throw e;
     if (e instanceof Error && ["AbortError", "TimeoutError"].includes(e.name))

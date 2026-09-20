@@ -43,7 +43,7 @@ try {
   while (true) {
     assert.equal(child.exitCode, null, output);
     try {
-      if ((await fetch(base)).ok) break;
+      if ((await fetch(base, { signal: AbortSignal.timeout(1000) })).ok) break;
     } catch {
       /* wait for listen */
     }
@@ -54,7 +54,22 @@ try {
   const location = await fetch(base + "/api/search?q=48.142,11.577");
   assert.equal(location.status, 200);
   assert.equal((await location.json()).places[0].lat, 48.142);
-  const bad = await fetch(base + "/api/loops", { method: "POST", body: "{}" });
+  assert.ok(location.headers.has("x-request-id"));
+  assert.equal(location.headers.get("x-content-type-options"), "nosniff");
+  assert.ok(
+    location.headers
+      .get("content-security-policy")
+      .includes("https://bachfischer.me"),
+  );
+  assert.equal(location.headers.has("x-powered-by"), false);
+  const health = await fetch(base + "/api/health");
+  assert.deepEqual(await health.json(), { status: "ok" });
+  assert.equal(health.headers.get("cache-control"), "no-store");
+  const bad = await fetch(base + "/api/loops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
   assert.equal(bad.status, 400);
   for (const ip of ["192.0.2.1", "192.0.2.2"]) {
     const response = await fetch(base + "/api/loops", {

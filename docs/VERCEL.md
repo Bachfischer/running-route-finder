@@ -22,7 +22,7 @@ Preview Deployment Protection may require sign-in. Use the signed-in browser to 
 
 ## Runtime and caching
 
-API handlers explicitly use Node.js. Routing has a 180-second function limit; address search has 60 seconds. The existing route search allows up to six map queries with a 110-second area-search deadline; a synchronous graph calculation already underway can extend past that deadline. Frankfurt (`fra1`) keeps execution close to the initial Munich audience. The graph algorithm is unchanged by this migration.
+API handlers explicitly use Node.js. Routing has a 180-second function limit; address search has 60 seconds. The existing route search allows up to six map queries with a 110-second area-search deadline; the candidate loop also checks wall-clock time and preserves an already found valid loop. A graph build or A* leg already underway cannot be preempted. Frankfurt (`fra1`) keeps execution close to the initial Munich audience. The graph algorithm is unchanged by this migration.
 
 Vercel Runtime Cache shares compressed map areas across instances, with a 15-minute TTL and project-specific namespace. The application enforces a 1.95 MB serialized entry cap, below the documented 2 MB limit. Cache errors/timeouts fail open. Preview and production caches are separated by Vercel. Local development uses four bounded in-memory entries. Graphs and final routes are not cached.
 
@@ -37,3 +37,5 @@ Apply `integration/website-projects.patch` in the existing website repository, s
 Use Vercel's deployment rollback for a bad release and revert the source change through a PR. If the map schema/query changes, increment the cache key/namespace version. Existing data expires within 15 minutes; deployment rollback alone does not clear Runtime Cache.
 
 References: [GitHub integration](https://vercel.com/docs/git/vercel-for-github), [Node.js runtime](https://vercel.com/docs/functions/runtimes/node-js), [Runtime Cache](https://vercel.com/docs/caching/runtime-cache), [cache SDK](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package), [request headers](https://vercel.com/docs/headers/request-headers).
+
+See [the production runbook](PRODUCTION.md) for request limits, monitoring, dependency maintenance and launch requirements.

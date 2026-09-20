@@ -5,7 +5,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      framework:
+        patterns:
+          ["next", "eslint-config-next", "react", "react-dom", "@types/react*"]
+      styling:
+        patterns: ["tailwindcss", "@tailwindcss/*"]
+      tooling:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

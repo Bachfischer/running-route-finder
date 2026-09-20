@@ -17,6 +17,7 @@ Open the URL printed by the development server. The Munich example selects Odeon
 ## Quality checks
 
 ```sh
+pnpm run audit
 pnpm check
 pnpm test:memory
 pnpm build
@@ -27,7 +28,7 @@ pnpm test:ui
 
 `pnpm check` runs formatting, ESLint, TypeScript, and Node unit/API/regression tests with coverage gates (90% lines/functions; 80% branches). `test:server` exercises a real compiled Next.js server with recorded Overpass data, including repeated-search caching. Playwright runs the UI scenarios at desktop and mobile sizes against the compiled Node.js server. Public tile and routing requests are intercepted in those UI tests; coordinate lookup exercises the actual API. Tests do not need provider availability or Vercel credentials.
 
-The real Munich OSM fixture includes park polygons and signal tags. Assertions require a closed loop within 500 m of 10 km, over 70% mapped green spaces, over 90% paths/tracks, under 5% repeat, and no mapped signal encounters. Access restrictions, barriers, pedestrian one-way rules, disconnected graphs, dense-area retries, response streaming limits, rate limits and provider failures have independent tests. See [testing details](docs/TESTING.md).
+The real Munich OSM fixture includes park polygons and signal tags. Assertions require a closed loop within 500 m of 10 km, over 88% mapped green spaces, over 98% paths/tracks, under 5% repeat, and no mapped signal encounters. Access restrictions, barriers, pedestrian one-way rules, disconnected graphs, dense-area retries, response streaming limits, rate limits and provider failures have independent tests. See [testing details](docs/TESTING.md).
 
 Optional live check, deliberately excluded from normal CI to avoid repeatedly hitting public providers:
 
@@ -40,6 +41,10 @@ pnpm test:live
 Import this repository into Vercel as a Next.js project using Node 24. Pull requests receive preview deployments; `main` is production. `vercel.json` selects Frankfurt and runs core checks before building. Require **Quality and routing regressions** before merging, since the full browser suite runs in GitHub Actions. Vercel Git deployment does not wait for unrelated Actions jobs.
 
 See [the deployment and CI guide](docs/VERCEL.md) for the initial import, custom domain, branch protection and rollback. No GitHub deployment token or database is needed. The existing Jekyll/GitHub Pages site stays in its own repository.
+
+## Production operation
+
+The app has six runtime dependencies. Formatting and lint cover all maintained components and scripts; CI also audits development and production dependencies. See [the production runbook](docs/PRODUCTION.md) for dependency decisions, diagnostics, timeout behavior and remaining launch settings.
 
 ## Map cache
 
