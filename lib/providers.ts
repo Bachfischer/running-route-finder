@@ -1,4 +1,8 @@
-import { MapCapacityError, ProviderError } from "./errors.ts";
+import {
+  MapCapacityError,
+  ProviderError,
+  ProviderConnectionError,
+} from "./errors.ts";
 export type Fetcher = typeof fetch;
 export function provider(name: string, fallback: string) {
   const u = new URL(process.env[name] || fallback);
@@ -64,9 +68,7 @@ export async function jsonFetch(
   } catch (e) {
     if (e instanceof Error && ["AbortError", "TimeoutError"].includes(e.name))
       throw new ProviderError("The map service timed out. Please try again.");
-    throw new ProviderError(
-      "Could not reach the map service. Please try again.",
-    );
+    throw new ProviderConnectionError();
   }
   if (!res.ok) {
     await res.body?.cancel();

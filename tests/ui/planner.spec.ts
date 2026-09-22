@@ -15,7 +15,9 @@ async function mockRoutes(page: Page) {
   await page.route("**/api/loops", (route) => route.fulfill({ json: result }));
 }
 async function find(page: Page) {
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByLabel("Route recommendation")).toBeVisible();
 }
 test.beforeEach(async ({ page }) => {
@@ -36,7 +38,7 @@ test("initial state has no fabricated route and requires a start", async ({
   page,
 }) => {
   await expect(
-    page.getByRole("button", { name: "Find my loop", exact: true }),
+    page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeDisabled();
   await expect(page.getByRole("button", { name: "Download GPX" })).toHaveCount(
     0,
@@ -54,7 +56,7 @@ test("Munich example sets start, 10 km and north", async ({ page }) => {
   await page.getByText("Direction: N", { exact: true }).click();
   await expect(page.getByLabel("Preferred direction")).toHaveValue("N");
   await expect(
-    page.getByRole("button", { name: "Find my loop", exact: true }),
+    page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
 });
 for (const value of ["", "1", "26"])
@@ -64,7 +66,7 @@ for (const value of ["", "1", "26"])
     await choose(page);
     await page.getByLabel("Target distance").fill(value);
     await expect(
-      page.getByRole("button", { name: "Find my loop", exact: true }),
+      page.getByRole("button", { name: "Find a running route", exact: true }),
     ).toBeDisabled();
     await expect(
       page.getByText("Enter a distance between 2 and 25 km."),
@@ -85,7 +87,7 @@ test("coordinate lookup works through the real Node.js API using keyboard", asyn
   await page.getByLabel("Starting point").press("Enter");
   await expect(page.getByText(/Start selected/)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Find my loop", exact: true }),
+    page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
 });
 test("10 km result, green coverage, signals and explanation are displayed", async ({
@@ -125,7 +127,9 @@ test("request carries selected inputs and prevents edits while loading", async (
     await route.fulfill({ json: result });
   });
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByLabel("Starting point")).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Finding your loop…" }),
@@ -144,7 +148,9 @@ test("provider failure is accessible and a retry can succeed", async ({
     }),
   );
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "map service is busy",
   );
@@ -155,7 +161,9 @@ test("provider failure is accessible and a retry can succeed", async ({
 test("network failure releases controls", async ({ page }) => {
   await page.route("**/api/loops", (route) => route.abort());
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   await expect(page.getByLabel("Starting point")).toBeEnabled();
 });
@@ -171,7 +179,9 @@ test("a route search can be cancelled without accepting a late response", async 
     await route.fulfill({ json: result }).catch(() => {});
   });
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Cancel search" }),
   ).toBeVisible();
@@ -196,7 +206,9 @@ test("gateway HTML errors release controls with a readable message", async ({
     }),
   );
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "incomplete response",
   );
@@ -210,7 +222,9 @@ test("malformed successful route responses do not crash the planner", async ({
     route.fulfill({ json: { routes: [] } }),
   );
   await choose(page);
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "invalid data",
   );
@@ -223,7 +237,7 @@ test("editing a start clears the previous recommendation", async ({ page }) => {
   await page.getByLabel("Starting point").fill("Berlin");
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Find my loop", exact: true }),
+    page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
 });
 test("changing distance or direction clears stale results", async ({
@@ -270,7 +284,7 @@ test("map click sets a start", async ({ page }) => {
     page.getByText("Start selected ·", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Find my loop", exact: true }),
+    page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
 });
 test("results do not cover the map and page has no horizontal overflow", async ({
@@ -305,10 +319,7 @@ for (const name of ["Running route finder", "Launch route finder"]) {
   }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page
-      .getByRole("navigation")
-      .getByRole("link", { name: "Projects" })
-      .click();
+    await page.goto("/projects/");
     await expect(
       page.getByRole("heading", { name: "Projects", exact: true }),
     ).toBeVisible();
@@ -391,7 +402,9 @@ test("ambiguous addresses require a deliberate location choice", async ({
     }),
   );
   await page.getByLabel("Starting point").fill("Munich");
-  await page.getByRole("button", { name: "Find my loop", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Find a running route", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Munich center", exact: true }),
   ).toBeVisible();
@@ -401,4 +414,18 @@ test("ambiguous addresses require a deliberate location choice", async ({
     .click();
   await find(page);
   expect(calls).toBe(1);
+});
+
+test("standalone planner explains its purpose without blog navigation", async ({
+  page,
+}) => {
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(/Choose your starting point and distance/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Find a running route", exact: true }),
+  ).toBeVisible();
 });
