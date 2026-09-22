@@ -21,6 +21,7 @@ Seven-day package maturity remains enabled. Targeted transitive security floors 
 ## Request lifecycle
 
 - Route requests require JSON, a same-origin browser context when origin headers are present, at most 1,500 body bytes, and a five-second body-read budget. Non-browser clients may omit Origin. These checks complement rate limiting; they do not authenticate users.
+- A connection failure to the default Overpass host gets one sequential attempt at `overpass.private.coffee`, sharing the same area deadline. HTTP errors (including throttling), cancelled requests, malformed data and custom-provider failures do not trigger failover.
 - Provider requests bypass implicit framework caching, prohibit redirects, have bounded streaming bodies and a maximum 40-second fetch/body timeout. Only the explicit validated map cache persists provider data.
 - Browser address requests time out after 45 seconds; route requests after 150 seconds. Cancelling a search aborts the browser fetch and ignores late responses. Server request cancellation propagates to map loading where the hosting platform delivers the disconnect signal.
 - Route searches have up to six queries and a 110-second budget. Wall-clock checks between candidates preserve an already computed loop on budget exhaustion. Synchronous graph construction and A* legs cannot be interrupted mid-execution. The 180-second Vercel function limit is the final ceiling, not a promised response time.

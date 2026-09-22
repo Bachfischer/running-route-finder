@@ -199,3 +199,78 @@ test("map query preserves unsignalled and railway crossing nodes", () => {
   assert.ok(query.includes("node.nodes[crossing]"));
   assert.ok(query.includes("node.nodes[railway]"));
 });
+
+test("connection failure retries once on the backup within the same signal budget", async () => {
+  const calls = [];
+  const signal = AbortSignal.timeout(1000);
+  const result = await loadArea(
+    searchAreas(input)[0],
+    signal,
+    async (url, init) => {
+      calls.push({ url: url.href, body: init.body, signal: init.signal });
+      if (calls.length === 1) throw new TypeError("fetch failed");
+      return Response.json({ elements: data });
+    },
+  );
+  assert.equal(result.length, data.length);
+  assert.deepEqual(
+    calls.map((x) => x.url),
+    [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+    ],
+  );
+  assert.equal(calls[0].body, calls[1].body);
+});
+for (const status of [403, 406, 429, 500, 503, 504])
+  test(`HTTP ${status} never triggers another provider`, async () => {
+    let calls = 0;
+    await assert.rejects(
+      loadArea(searchAreas(input)[0], AbortSignal.timeout(1000), async () => {
+        calls++;
+        return new Response("unavailable", { status });
+      }),
+      ProviderError,
+    );
+    assert.equal(calls, 1);
+  });
+test("custom provider connection failures never send its query to a public backup", async () => {
+  process.env.OVERPASS_URL = "https://custom.example/api";
+  let calls = 0;
+  try {
+    await assert.rejects(
+      loadArea(searchAreas(input)[0], AbortSignal.timeout(1000), async () => {
+        calls++;
+        throw new TypeError("fetch failed");
+      }),
+      ProviderError,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    delete process.env.OVERPASS_URL;
+  }
+});
+test("failed backup does not cause a retry loop", async () => {
+  let calls = 0;
+  await assert.rejects(
+    loadArea(searchAreas(input)[0], AbortSignal.timeout(1000), async () => {
+      calls++;
+      throw new TypeError("fetch failed");
+    }),
+    ProviderError,
+  );
+  assert.equal(calls, 2);
+});
+test("cancelled primary prevents fallback", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  await assert.rejects(
+    loadArea(searchAreas(input)[0], controller.signal, async () => {
+      calls++;
+      controller.abort();
+      throw new TypeError("fetch failed");
+    }),
+    { name: "AbortError" },
+  );
+  assert.equal(calls, 1);
+});

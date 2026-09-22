@@ -20,3 +20,11 @@ export class ProviderError extends Error {
     this.status = status;
   }
 }
+
+// Distinguish connection failures from throttling, invalid data and query limits.
+export class ProviderConnectionError extends ProviderError {
+  constructor() {
+    super("Could not connect to the map provider. Please try again shortly.");
+    this.name = "ProviderConnectionError";
+  }
+}

@@ -6,7 +6,12 @@ import {
   type LoopResult,
   type OSMElement,
 } from "./routing.ts";
-import { MapCapacityError, ProviderError, RouteError } from "./errors.ts";
+import {
+  MapCapacityError,
+  ProviderError,
+  ProviderConnectionError,
+  RouteError,
+} from "./errors.ts";
 import { jsonFetch, provider, type Fetcher } from "./providers.ts";
 export type RouteInput = {
   lat: number;
@@ -65,19 +70,34 @@ export async function loadArea(
   signal: AbortSignal,
   fetcher: Fetcher = fetch,
 ) {
-  return elementsFrom(
-    await jsonFetch(
-      provider("OVERPASS_URL", "https://overpass-api.de/api/interpreter"),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ data: mapQuery(area) }).toString(),
-        signal,
-      },
-      18_000_000,
-      fetcher,
-    ),
+  const primary = provider(
+    "OVERPASS_URL",
+    "https://overpass-api.de/api/interpreter",
   );
+  const read = async (url: URL) =>
+    elementsFrom(
+      await jsonFetch(
+        url,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ data: mapQuery(area) }).toString(),
+          signal,
+        },
+        18_000_000,
+        fetcher,
+      ),
+    );
+  try {
+    return await read(primary);
+  } catch (error) {
+    signal.throwIfAborted();
+    // One sequential fallback for an unreachable default host, within the same
+    // area deadline. Never bypass throttling or send custom-provider data elsewhere.
+    if (!(error instanceof ProviderConnectionError) || process.env.OVERPASS_URL)
+      throw error;
+    return read(new URL("https://overpass.private.coffee/api/interpreter"));
+  }
 }
 export type AreaLoader = (
   area: SearchArea,

@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toGpx } from "@/lib/gpx";
-import { SiteHeader, SiteFooter } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-header";
 import type { LoopResult } from "@/lib/routing";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
@@ -321,10 +321,13 @@ export default function Home() {
     <main className={embedded ? "app embedded" : "app"}>
       {!embedded && (
         <>
-          <SiteHeader />
           <div className="project-heading">
             <h1>Running route finder</h1>
-            <p>Prefer parks. Cross fewer roads. Finish where you started.</p>
+            <p>
+              Choose your starting point and distance. Find a circular running
+              route that prefers parks and quieter paths, avoids mapped
+              interruptions, and brings you back to the start.
+            </p>
           </div>
         </>
       )}
@@ -557,7 +560,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  Find my loop <ArrowUpRight size={20} />
+                  Find a running route <ArrowUpRight size={20} />
                 </>
               )}
             </Button>
