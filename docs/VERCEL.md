@@ -52,7 +52,7 @@ Wait for Vercel to validate the domain and issue TLS. Check that the domain is a
      --data '{"lat":48.142,"lon":11.577,"distance":10,"direction":"N"}'
    ```
 
-   Expect HTTP 200 and a nonempty `routes` array containing actual coordinates and a distance reasonably close to 10,000 metres. An error envelope, empty route or HTML login page is a failure, regardless of the build status. Inspect continuity and mapped interruption counts; live OSM data need not match the recorded fixture exactly. Keep response files locally, not in Git. Respect `Retry-After` on 429; do not run this as a frequent uptime probe.
+   Expect HTTP 200 and a nonempty `routes` array containing actual coordinates and a distance reasonably close to 10,000 metres. An error envelope, empty route or HTML login page is a failure, regardless of build status. Check continuity and `source: "openrouteservice"` with the key configured. ORS green/quiet ratings are estimates and do not include interruption counts. Keep response files locally, not in Git. Respect `Retry-After` on 429; do not run this as a frequent uptime probe.
 
 ## Troubleshooting
 
@@ -81,9 +81,9 @@ Preview Deployment Protection may require sign-in. Use the signed-in browser to 
 
 ## Runtime and caching
 
-API handlers explicitly use Node.js. Routing has a 180-second function limit; address search has 60 seconds. The existing route search allows up to six map queries with a 110-second area-search deadline; the candidate loop also checks wall-clock time and preserves an already found valid loop. A graph build or A* leg already underway cannot be preempted. Frankfurt (`fra1`) keeps execution close to the initial Munich audience. The graph algorithm is unchanged by this migration.
+API handlers explicitly use Node.js. Routing has a 180-second function limit; address search has 60 seconds. With `ORS_API_KEY`, four deterministic seed attempts each have a 12-second timeout; one valid candidate survives a later upstream failure. The original Overpass route search without a key allows up to six map queries with a 110-second area-search deadline; the candidate loop checks wall-clock time and preserves a valid loop already found. A graph build or A* leg underway cannot be preempted. Frankfurt (`fra1`) keeps execution close to the initial Munich audience.
 
-Vercel Runtime Cache shares compressed map areas across instances, with a 15-minute TTL and project-specific namespace. The application enforces a 1.95 MB serialized entry cap, below the documented 2 MB limit. Cache errors/timeouts fail open. Preview and production caches are separated by Vercel. Local development uses four bounded in-memory entries. Graphs and final routes are not cached.
+For the original Overpass engine, Vercel Runtime Cache shares compressed map areas across instances, with a 15-minute TTL and project-specific namespace. The application enforces a 1.95 MB serialized entry cap, below the documented 2 MB limit. Cache errors/timeouts fail open. Preview and production caches are separated by Vercel. Local development uses four bounded in-memory entries. ORS results, graphs and final routes are not cached.
 
 The recorded Munich production-server test verifies a 10.26 km closed loop, over 88% mapped green space, over 98% paths, under 5% repeat and no mapped signals, crossings, barriers, railway crossings or stairs. It also verifies two searches require one Overpass download. This exercises production packaging with recorded external data, not Vercel's remote cache service or present-day path conditions.
 
