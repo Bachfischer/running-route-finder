@@ -274,3 +274,162 @@ test("cancelled primary prevents fallback", async () => {
   );
   assert.equal(calls, 1);
 });
+
+test("primary timeout gets a fresh bounded backup attempt and private diagnostics", async () => {
+  const calls = [],
+    events = [];
+  const result = await loadArea(
+    searchAreas(input)[0],
+    AbortSignal.timeout(1000),
+    async (url, init) => {
+      calls.push({ url: url.href, signal: init.signal });
+      if (calls.length === 1)
+        throw new DOMException("secret upstream detail", "TimeoutError");
+      assert.equal(init.signal.aborted, false);
+      return Response.json({ elements: data });
+    },
+    (event) => events.push(event),
+  );
+  assert.equal(result.length, data.length);
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].signal, calls[1].signal);
+  assert.deepEqual(
+    events.map((e) => [e.provider, e.outcome]),
+    [
+      ["primary", "timeout"],
+      ["backup", "success"],
+    ],
+  );
+  for (const event of events) {
+    assert.deepEqual(Object.keys(event).sort(), [
+      "durationMs",
+      "event",
+      "outcome",
+      "provider",
+    ]);
+    assert.ok(event.durationMs >= 0);
+  }
+  assert.ok(!JSON.stringify(events).includes("secret"));
+});
+
+test("search reserves two provider budgets without extending the total deadline", async (t) => {
+  const timeouts = [];
+  const timeout = AbortSignal.timeout;
+  t.mock.method(AbortSignal, "timeout", (ms) => {
+    timeouts.push(ms);
+    return timeout(ms);
+  });
+  let nowCalls = 0;
+  await assert.rejects(
+    searchLoops(
+      input,
+      async () => {
+        throw new ProviderError("stop");
+      },
+      () => (nowCalls++ === 0 ? 0 : 10000),
+    ),
+    ProviderError,
+  );
+  assert.equal(timeouts[0], 80000);
+  timeouts.length = 0;
+  nowCalls = 0;
+  await assert.rejects(
+    searchLoops(
+      input,
+      async () => {
+        throw new ProviderError("stop");
+      },
+      () => (nowCalls++ === 0 ? 0 : 90000),
+    ),
+    ProviderError,
+  );
+  assert.equal(timeouts[0], 20000);
+});
+
+test("an expired primary timer does not abort the backup request", async (t) => {
+  const parent = new AbortController();
+  const timeout = AbortSignal.timeout;
+  t.mock.method(AbortSignal, "timeout", () => timeout(10));
+  const keepAlive = setTimeout(() => parent.abort(), 1000);
+  let primarySignal;
+  let calls = 0;
+  try {
+    const result = await loadArea(
+      searchAreas(input)[0],
+      parent.signal,
+      async (_url, init) => {
+        calls++;
+        if (calls === 1) {
+          primarySignal = init.signal;
+          return await new Promise((_, reject) => {
+            init.signal.addEventListener(
+              "abort",
+              () => reject(init.signal.reason),
+              { once: true },
+            );
+          });
+        }
+        assert.equal(primarySignal.aborted, true);
+        assert.equal(init.signal.aborted, false);
+        assert.equal(parent.signal.aborted, false);
+        return Response.json({ elements: data });
+      },
+      () => {},
+    );
+    assert.equal(result.length, data.length);
+    assert.equal(calls, 2);
+  } finally {
+    clearTimeout(keepAlive);
+  }
+});
+
+test("two timed-out providers stop after two attempts", async () => {
+  let calls = 0;
+  await assert.rejects(
+    loadArea(
+      searchAreas(input)[0],
+      AbortSignal.timeout(1000),
+      async () => {
+        calls++;
+        throw new DOMException("timeout", "TimeoutError");
+      },
+      () => {},
+    ),
+    ProviderError,
+  );
+  assert.equal(calls, 2);
+});
+
+test("custom provider timeout never fails over", async () => {
+  process.env.OVERPASS_URL = "https://custom.example/api";
+  let calls = 0;
+  try {
+    await assert.rejects(
+      loadArea(
+        searchAreas(input)[0],
+        AbortSignal.timeout(1000),
+        async () => {
+          calls++;
+          throw new DOMException("timeout", "TimeoutError");
+        },
+        () => {},
+      ),
+      ProviderError,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    delete process.env.OVERPASS_URL;
+  }
+});
+
+test("broken provider telemetry does not break route loading", async () => {
+  const result = await loadArea(
+    searchAreas(input)[0],
+    AbortSignal.timeout(1000),
+    async () => Response.json({ elements: data }),
+    () => {
+      throw Error("logging unavailable");
+    },
+  );
+  assert.equal(result.length, data.length);
+});
