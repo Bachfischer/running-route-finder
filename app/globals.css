@@ -594,21 +594,30 @@ a {
 .site-footer {
   border-top: 1px solid #bdc1c4;
   background: #f2f3f3;
-  margin-top: 40px;
-  padding: 25px 24px 30px;
+  margin-top: 48px;
+  padding: 30px 24px 32px;
   color: #707980;
-  font-size: 12px;
 }
-.site-footer > div {
-  max-width: 1232px;
+.site-footer-inner {
+  max-width: 1280px;
   margin: auto;
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  flex-wrap: wrap;
 }
 .site-footer a {
   color: inherit;
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+.site-footer-follow {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.site-footer-copyright {
+  font-size: 11px;
+  line-height: 1.5;
 }
 .embedded .workspace {
   margin: 0;
@@ -956,6 +965,311 @@ a {
 }
 .detail-facts {
   margin-top: 12px;
+}
+
+/* Route planner: a calmer surface around the map and an interactive compass. */
+.app {
+  --site-text: #494e52;
+  --site-gray: #7a8288;
+  --site-link: #39829a;
+  background: #fff;
+  min-height: 100vh;
+}
+.project-heading {
+  max-width: 1300px;
+  margin: 34px auto 28px;
+}
+.heading-kicker,
+.intro-kicker {
+  color: #39829a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.heading-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.project-heading h1 {
+  font-size: clamp(32px, 3.6vw, 49px);
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  color: #494e52;
+  margin-bottom: 10px;
+}
+.project-heading p {
+  color: #707980;
+  max-width: 690px;
+  line-height: 1.55;
+}
+.workspace {
+  max-width: 1252px;
+  grid-template-columns: 362px minmax(0, 1fr);
+  min-height: 690px;
+  border: 1px solid #dfe2e3;
+  border-radius: 8px;
+  box-shadow: 0 18px 56px #202b3010;
+}
+.sidebar {
+  padding: 30px;
+  border-right-color: #e4e6e7;
+}
+.intro {
+  margin-bottom: 24px;
+}
+.intro h2 {
+  font-size: 25px;
+  letter-spacing: -0.035em;
+  color: #494e52;
+  margin: 5px 0;
+}
+.intro p {
+  color: #707980;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+}
+.field-label {
+  color: #494e52;
+  font-size: 13px;
+}
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  background: #edf5f8;
+  border-radius: 7px;
+  color: #39829a;
+  font-size: 10px;
+  font-weight: 800;
+  width: 24px;
+  height: 24px;
+}
+.location-search,
+.distance-control {
+  border-color: #becbd1;
+  border-radius: 10px;
+  background: #fff;
+}
+.location-search {
+  padding: 5px 6px 5px 10px;
+}
+.location-search > svg {
+  color: #39829a;
+}
+.location-search:focus-within {
+  outline-color: #52adc8;
+}
+.locate,
+.example-start {
+  color: #39829a;
+}
+.distance-control {
+  padding: 9px;
+}
+.distance-control input {
+  color: #494e52;
+}
+.distance-label > span,
+.optional {
+  color: #92999d;
+}
+.field-hint {
+  color: #7a8288;
+  margin-bottom: 14px;
+}
+.presets {
+  margin-bottom: 18px;
+}
+.presets button,
+.alternatives button {
+  border-radius: 8px;
+  border-color: #dfe2e3;
+  background: #fff;
+}
+.presets [aria-pressed="true"],
+.alternatives [aria-pressed="true"] {
+  background: #edf6f8;
+  border-color: #76afc0;
+  color: #39829a;
+}
+.direction-options {
+  padding: 17px 0 18px;
+  margin: 0 0 16px;
+  border-top: 1px solid #edf0f1;
+  border-bottom: 1px solid #edf0f1;
+}
+.direction-options .field-label {
+  margin: 0 0 12px;
+}
+.compass-layout {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+.compass {
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  grid-template-rows: repeat(3, 36px);
+  place-items: center;
+  flex: none;
+  padding: 6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0 32%,
+    #edf5f8 33% 35%,
+    #f7fafb 36% 68%,
+    #d9eaf0 69% 71%,
+    #fff 72%
+  );
+  box-shadow: inset 0 0 0 1px #dce8ec;
+}
+.compass button {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  border: 0;
+  border-radius: 50%;
+  color: #718790;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 750;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.15s;
+}
+.compass button:hover {
+  color: #2d6578;
+  background: #e4f2f6;
+}
+.compass button[aria-pressed="true"] {
+  color: #fff;
+  background: #39829a;
+  box-shadow: 0 2px 8px #2d65783d;
+}
+.compass button:active {
+  transform: scale(0.92);
+}
+.compass .compass-center {
+  width: 34px;
+  height: 34px;
+}
+.compass-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.compass-copy strong {
+  font-size: 13px;
+  color: #494e52;
+  line-height: 1.3;
+}
+.compass-copy span {
+  font-size: 12px;
+  color: #7a8288;
+  line-height: 1.4;
+}
+.find-button {
+  height: 50px;
+  border-radius: 10px;
+  background: #39829a;
+  padding: 0 16px;
+  box-shadow: 0 5px 12px #39829a26;
+}
+.find-button:hover {
+  background: #2d6578;
+  color: #fff;
+}
+.sidebar-footer {
+  color: #7a8288;
+}
+.sidebar-footer svg {
+  color: #39829a;
+}
+.map-panel {
+  background: #edf0ee;
+}
+.map-label,
+.map-controls button,
+.empty-card {
+  border-color: #dfe2e3;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px #2630391a;
+}
+.map-label {
+  color: #494e52;
+  font-weight: 600;
+}
+.empty-card {
+  max-width: 395px;
+  padding: 18px 20px;
+}
+.empty-icon {
+  background: #edf6f8;
+  border-radius: 10px;
+  color: #39829a;
+}
+.result-card {
+  background: #fff;
+  padding: 24px 30px;
+}
+.eyebrow,
+.recommendation-details summary {
+  color: #39829a;
+}
+.export-button {
+  border-radius: 9px;
+  border-color: #9ec5d1;
+  color: #39829a;
+}
+.status {
+  color: #646c72;
+}
+.places {
+  border-color: #becbd1;
+  border-radius: 10px;
+}
+.app :is(button, input, select, summary, a):focus-visible {
+  outline-color: #39829a;
+}
+.app .button:hover:not(.find-button) {
+  background: #edf5f8;
+  color: #2d6578;
+}
+.app .button[aria-pressed="true"]:hover {
+  background: #dceff4;
+}
+.embedded .workspace {
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (max-width: 760px) {
+  .project-heading {
+    margin: 22px 0 20px;
+  }
+  .project-heading h1 {
+    font-size: 34px;
+  }
+  .workspace {
+    margin: 0 12px 30px;
+    border-radius: 8px;
+  }
+  .sidebar {
+    padding: 22px;
+  }
+  .map-stage {
+    min-height: 460px;
+  }
+  .embedded .workspace {
+    margin: 0;
+  }
+  .result-card {
+    padding: 20px;
+  }
 }
 @media (max-width: 760px) {
   .project-heading {
