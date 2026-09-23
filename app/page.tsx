@@ -758,12 +758,12 @@ export default function Home() {
                 {result.source === "openrouteservice" ? (
                   <p>
                     Four seeded walking loops are requested with green and quiet
-                    preferences and mapped stairs avoided. We rank the returned
-                    routes by target distance, direction and green/quiet
-                    ratings. Ratings describe route segments, not park
-                    boundaries. Traffic lights and crossings are not counted by
-                    this provider; a stop-free run cannot be guaranteed. Check
-                    the map and local signs.
+                    preferences and mapped stairs avoided. One extra request may
+                    adjust the length. We rank the returned routes by target
+                    distance, direction and green/quiet ratings. Ratings
+                    describe route segments, not park boundaries. Traffic lights
+                    and crossings are not counted by this provider; a stop-free
+                    run cannot be guaranteed. Check the map and local signs.
                   </p>
                 ) : (
                   <>

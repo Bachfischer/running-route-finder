@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseRoute, quality, searchOrs } from "../lib/ors.ts";
-import { ProviderError } from "../lib/errors.ts";
+import { ProviderError, ProviderTimeoutError } from "../lib/errors.ts";
 import { createHandlers } from "../lib/http.ts";
 
 const input = { lat: 48.142, lon: 11.577, distance: 10, direction: "N" };
@@ -56,14 +56,20 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     new AbortController().signal,
     fetcher,
   );
-  assert.ok(calls.length >= 1 && calls.length <= 4);
+  assert.ok(calls.length >= 1 && calls.length <= 5);
   assert.ok(
     calls[0].url.startsWith("https://api.heigit.org/openrouteservice/"),
   );
   assert.ok(!calls[0].url.includes("example-secret"));
   assert.equal(calls[0].init.headers.get("Authorization"), "example-secret");
+  assert.equal(calls[0].init.headers.get("Accept"), "application/geo+json");
   assert.deepEqual(calls[0].body.coordinates, [origin]);
-  assert.equal(calls[0].body.options.round_trip.length, 10000);
+  assert.equal(calls[0].body.options.round_trip.length, 5000);
+  assert.equal(calls[0].body.options.round_trip.seed, 5);
+  assert.deepEqual(calls[0].body.options.profile_params.weightings, {
+    green: 1,
+    quiet: 1,
+  });
   assert.deepEqual(calls[0].body.options.avoid_features, ["steps", "ferries"]);
   assert.deepEqual(calls[0].body.extra_info, ["green", "noise"]);
   assert.equal(result.source, "openrouteservice");
@@ -79,6 +85,26 @@ test("direction ranks a northern loop ahead of an equally distant southern loop"
   const north = parseRoute(sample(true), origin, 10000, 0);
   const south = parseRoute(sample(false), origin, 10000, 0);
   assert.ok(north.route.score < south.route.score);
+});
+test("widely spaced seeds and one bounded correction improve an overshot loop", async () => {
+  const calls = [];
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    async (_url, init) => {
+      const roundTrip = JSON.parse(init.body).options.round_trip;
+      calls.push(roundTrip);
+      return Response.json(sample(true, calls.length === 5 ? 10200 : 15000));
+    },
+  );
+  assert.deepEqual(
+    calls.slice(0, 4).map((c) => c.seed),
+    [5, 17, 41, 101],
+  );
+  assert.ok(calls[4].length < 5000);
+  assert.equal(calls[4].seed, 5);
+  assert.equal(result.routes[0].distance, 10200);
 });
 test("unknown provider statistics do not invent green coverage", () => {
   const raw = sample();
@@ -155,8 +181,34 @@ test("a later provider outage preserves an already valid candidate", async () =>
         ? Response.json(sample(false, 15000))
         : new Response("busy", { status: 503 }),
   );
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.equal(found.routes.length, 1);
+});
+test("a timed-out first seed tries another without extending past four attempts", async () => {
+  let calls = 0;
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    async () => {
+      if (++calls === 1) throw new DOMException("slow", "TimeoutError");
+      return Response.json(sample(true, 10100));
+    },
+  );
+  assert.equal(result.routes[0].distance, 10100);
+  assert.ok(calls <= 4);
+  assert.ok(calls >= 2);
+});
+test("four timed-out seeds fail with a useful timeout", async () => {
+  let calls = 0;
+  await assert.rejects(
+    searchOrs(input, "test-key", new AbortController().signal, async () => {
+      calls++;
+      throw new DOMException("slow", "TimeoutError");
+    }),
+    ProviderTimeoutError,
+  );
+  assert.equal(calls, 4);
 });
 test("same-origin API returns a 10 km Munich GPX-ready loop via managed provider", async () => {
   const handlers = createHandlers({

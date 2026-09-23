@@ -1,6 +1,6 @@
 # Running route finder
 
-A park-focused running-loop planner on Next.js and Vercel. Choose a start, 2–25 km, and a direction; compare loops and download the displayed route as GPX. For reliable live routing, configure a free openrouteservice `ORS_API_KEY` in Vercel Preview and Production. The server requests at most four green/quiet walking loops, then ranks distance, direction and route ratings. ORS does not count traffic lights or guarantee no stops. Without a key, the original mapped Overpass engine remains available but its public hosts may time out. No LLM or database.
+A park-focused running-loop planner on Next.js and Vercel. Choose a start, 2–25 km, and a direction; compare loops and download the displayed route as GPX. For reliable live routing, configure a free openrouteservice `ORS_API_KEY` in Vercel Preview and Production. The server requests four green/quiet walking loops, with at most one length adjustment, then ranks distance, direction and route ratings. ORS does not count traffic lights or guarantee no stops. Without a key, the original mapped Overpass engine remains available but its public hosts may time out. No LLM or database.
 
 ## Local development
 
@@ -33,8 +33,11 @@ The real Munich OSM fixture includes park polygons and signal tags. Assertions r
 Optional live check, deliberately excluded from normal CI to avoid repeatedly hitting public providers:
 
 ```sh
+cp .env.example .env.local # Set ORS_API_KEY to a newly generated key in this untracked file.
 pnpm test:live
 ```
+
+This calls `api.heigit.org` with your key and a 10 km Odeonsplatz round trip. A 403 means the provider disallowed the key even if unit tests pass; fix the key before deploying. Never commit `.env.local` or print the key in test output.
 
 ## Vercel deployment
 
