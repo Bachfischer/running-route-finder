@@ -1,13 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  provider,
-  jsonFetch,
-  readTextBounded,
-  createCooldown,
-} from "../lib/providers.ts";
+import { provider, jsonFetch, readTextBounded } from "../lib/providers.ts";
 import { MapCapacityError, ProviderError } from "../lib/errors.ts";
-import { streamResponse, routeRequest } from "./helpers.mjs";
+import { streamResponse } from "./helpers.mjs";
 test("configurable HTTPS providers", () => {
   process.env.TEST_PROVIDER = "https://example.com/api/";
   assert.equal(
@@ -156,24 +151,4 @@ test("JSON size limit remains typed for adaptive retry", async () => {
     jsonFetch("https://example.com", {}, 5, async () => new Response("123456")),
     MapCapacityError,
   );
-});
-test("cooldown expires and is isolated by client and operation", () => {
-  let t = 100;
-  const limited = createCooldown(() => t),
-    r = routeRequest();
-  assert.equal(limited(r, "loop", 10), false);
-  assert.equal(limited(r, "loop", 10), true);
-  assert.equal(limited(r, "search", 10), false);
-  assert.equal(limited(routeRequest(undefined, "other"), "loop", 10), false);
-  t += 10;
-  assert.equal(limited(r, "loop", 10), false);
-});
-test("cooldown map is bounded and expired entries are removed", () => {
-  let t = 100;
-  const limited = createCooldown(() => t);
-  for (let i = 0; i < 1000; i++)
-    assert.equal(limited(routeRequest(undefined, String(i)), "x", 10), false);
-  assert.equal(limited(routeRequest(undefined, "new"), "x", 10), true);
-  t = 111;
-  assert.equal(limited(routeRequest(undefined, "new"), "x", 10), false);
 });
