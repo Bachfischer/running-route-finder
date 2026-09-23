@@ -75,7 +75,10 @@ export async function jsonFetch(
   if (!res.ok) {
     await res.body?.cancel();
     throw new ProviderError(
-      "The map data service is busy. Please try again in a minute.",
+      (res.status === 401 || res.status === 403) &&
+        new Headers(init.headers).has("Authorization")
+        ? "The routing provider rejected its server-side API key. Check ORS_API_KEY in Vercel and redeploy."
+        : "The map data service is busy. Please try again in a minute.",
       res.status === 429 ? 429 : 503,
     );
   }

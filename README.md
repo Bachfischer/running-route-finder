@@ -1,6 +1,6 @@
 # Running route finder
 
-A park-focused running-loop planner on Next.js and Vercel. Choose a start, 2–25 km, and a direction; compare loops, see green-space and traffic-light estimates, and download the displayed route as GPX. React/Next.js, Leaflet and OpenStreetMap; no LLM, database or routing API key.
+A park-focused running-loop planner on Next.js and Vercel. Choose a start, 2–25 km, and a direction; compare loops and download the displayed route as GPX. For reliable live routing, configure a free openrouteservice `ORS_API_KEY` in Vercel Preview and Production. The server requests at most four green/quiet walking loops, then ranks distance, direction and route ratings. ORS does not count traffic lights or guarantee no stops. Without a key, the original mapped Overpass engine remains available but its public hosts may time out. No LLM or database.
 
 ## Local development
 
@@ -74,7 +74,7 @@ On the refreshed 2026-09-15 Odeonsplatz extract, the 10 km recommendation is **1
 - Overpass paths, green boundaries and signals: `OVERPASS_URL`, default `https://overpass-api.de/api/interpreter`. Streamed 18 MB response cap; 130,000-element graph cap; per-query timeout up to 40 seconds.
 - OSM map tiles through locally bundled Leaflet; visible attribution. Tile requests reveal the viewed map area to the tile provider.
 
-Coordinates go to Overpass; if the default host has a connection failure or times out, one request to the Private.coffee Overpass instance is attempted with a fresh timeout of up to 40 seconds. Both attempts remain within the 110-second search deadline. Custom providers never use that public fallback. Typed address searches go to Photon. There is no application location-history database. Provider URLs can be configured using environment variables in Vercel project settings; both must be HTTPS and preserve the expected API format. Do not put credentials into URLs. Instance-local cooldowns and one routing job per instance limit pressure, but are not distributed abuse protection. Configure edge rate limiting and a managed/self-hosted provider before broad public use. Public endpoints can throttle and have no uptime guarantee.
+With `ORS_API_KEY`, coordinates go to openrouteservice over HTTPS and the key stays in a server-side Authorization header. Without the key, coordinates go to Overpass; if the default host cannot be reached or times out, one request to Private.coffee Overpass is attempted. Typed address searches go to Photon. There is no application location-history database. Optional provider URL overrides must use HTTPS; never put credentials in URLs. Instance-local cooldowns and one routing job per instance are not distributed abuse protection. Configure edge rate limiting before broad public use.
 
 See [Photon usage](https://github.com/komoot/photon#demo-server), [Overpass resource guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html), and [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
 

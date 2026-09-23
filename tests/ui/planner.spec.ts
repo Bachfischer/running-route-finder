@@ -109,6 +109,30 @@ test("10 km result, green coverage, signals and explanation are displayed", asyn
   await page.getByText("Why this loop?", { exact: true }).click();
   await expect(page.getByText(/We favor mapped parks/)).toBeVisible();
 });
+test("managed-provider result describes ratings without invented traffic-light counts", async ({
+  page,
+}) => {
+  await page.route("**/api/loops", (route) =>
+    route.fulfill({
+      json: {
+        ...result,
+        source: "openrouteservice",
+        quality: result.routes.map(() => ({ green: 0.76, quiet: 0.84 })),
+      },
+    }),
+  );
+  await choose(page);
+  await find(page);
+  await expect(page.getByText("76% of route rated green")).toBeVisible();
+  await expect(page.getByText("84% of route rated quiet")).toBeVisible();
+  await expect(page.getByText(/mapped traffic-light encounters/)).toHaveCount(
+    0,
+  );
+  await page.getByText("Why this loop?").click();
+  await expect(
+    page.getByText(/Traffic lights and crossings are not counted/),
+  ).toBeVisible();
+});
 test("request carries selected inputs and prevents edits while loading", async ({
   page,
 }) => {
