@@ -65,31 +65,42 @@ for (const body of ["{", "x".repeat(1501), "null"])
       400,
     );
   });
-test("same-client loop cooldown returns Retry-After", async () => {
-  const h = createHandlers({ search: async () => result });
-  await h.loops(routeRequest(valid));
-  const res = await h.loops(routeRequest(valid));
-  assert.equal(res.status, 429);
-  assert.equal(res.headers.get("Retry-After"), "15");
+test("a visitor can immediately request another route", async () => {
+  let calls = 0;
+  const h = createHandlers({
+    search: async () => {
+      calls++;
+      return result;
+    },
+  });
+  assert.equal((await h.loops(routeRequest(valid, "one"))).status, 200);
+  assert.equal((await h.loops(routeRequest(valid, "one"))).status, 200);
+  assert.equal(calls, 2);
 });
-test("in-flight guard prevents concurrent graph work and releases on failure", async () => {
-  let reject;
+test("multiple devices can calculate independently while another route is running", async () => {
+  const finish = [];
   const h = createHandlers({
     search: () =>
-      new Promise((_, r) => {
-        reject = r;
+      new Promise((resolve, reject) => {
+        finish.push({ resolve, reject });
       }),
   });
-  const first = h.loops(routeRequest(valid, "one"));
+  const first = h.loops(routeRequest(valid, "device-one"));
   await new Promise((r) => setImmediate(r));
-  const second = await h.loops(routeRequest(valid, "two"));
-  assert.equal(second.status, 429);
-  assert.equal(second.headers.get("Retry-After"), "5");
-  reject(new ProviderError("busy"));
+  const second = h.loops(routeRequest(valid, "device-two"));
+  await new Promise((r) => setImmediate(r));
+  const sameDevice = h.loops(routeRequest(valid, "device-one"));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(finish.length, 3);
+  finish[1].resolve(result);
+  assert.equal((await second).status, 200);
+  finish[2].resolve(result);
+  assert.equal((await sameDevice).status, 200);
+  finish[0].reject(new ProviderError("busy"));
   assert.equal((await first).status, 503);
-  const third = h.loops(routeRequest(valid, "three"));
+  const third = h.loops(routeRequest(valid, "device-one"));
   await new Promise((r) => setImmediate(r));
-  reject(new RouteError("NO_LOOP", "No route"));
+  finish[3].reject(new RouteError("NO_LOOP", "No route"));
   assert.equal((await third).status, 422);
 });
 for (const [e, status] of [
@@ -182,11 +193,17 @@ test("no location matches is successful empty list", async () => {
     { places: [] },
   );
 });
-test("location cooldown returns 429", async () => {
+test("concurrent location searches do not block other devices", async () => {
+  let calls = 0;
   const h = createHandlers({
-    fetcher: async () => Response.json({ features: [] }),
+    fetcher: async () => {
+      calls++;
+      return Response.json({ features: [] });
+    },
   });
   const req = new Request("https://test/api/search?q=Munich");
-  await h.location(req);
-  assert.equal((await h.location(req)).status, 429);
+  const [first, second] = await Promise.all([h.location(req), h.location(req)]);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(calls, 2);
 });

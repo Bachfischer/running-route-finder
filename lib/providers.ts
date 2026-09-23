@@ -99,17 +99,3 @@ export async function jsonFetch(
     );
   }
 }
-export function createCooldown(now: () => number = Date.now) {
-  const recent = new Map<string, number>();
-  return (req: Request, kind: string, ms: number) => {
-    const key = kind + ":" + (req.headers.get("x-real-ip") || "local");
-    const time = now();
-    if ((recent.get(key) || 0) > time) return true;
-    if (recent.size >= 1000) {
-      for (const [k, v] of recent) if (v <= time) recent.delete(k);
-      if (recent.size >= 1000) return true;
-    }
-    recent.set(key, time + ms);
-    return false;
-  };
-}
