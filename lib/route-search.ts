@@ -10,9 +10,15 @@ import {
   MapCapacityError,
   ProviderError,
   ProviderConnectionError,
+  ProviderTimeoutError,
   RouteError,
 } from "./errors.ts";
-import { jsonFetch, provider, type Fetcher } from "./providers.ts";
+import {
+  jsonFetch,
+  provider,
+  PROVIDER_TIMEOUT_MS,
+  type Fetcher,
+} from "./providers.ts";
 export type RouteInput = {
   lat: number;
   lon: number;
@@ -69,34 +75,72 @@ export async function loadArea(
   area: SearchArea,
   signal: AbortSignal,
   fetcher: Fetcher = fetch,
+  log: (event: Record<string, string | number>) => void = console.info,
 ) {
   const primary = provider(
     "OVERPASS_URL",
     "https://overpass-api.de/api/interpreter",
   );
-  const read = async (url: URL) =>
-    elementsFrom(
-      await jsonFetch(
-        url,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ data: mapQuery(area) }).toString(),
-          signal,
-        },
-        18_000_000,
-        fetcher,
-      ),
-    );
+  const read = async (url: URL, label: string) => {
+    const started = Date.now();
+    let outcome = "success";
+    try {
+      return elementsFrom(
+        await jsonFetch(
+          url,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ data: mapQuery(area) }).toString(),
+            signal,
+          },
+          18_000_000,
+          fetcher,
+        ),
+      );
+    } catch (error) {
+      outcome = signal.aborted
+        ? "cancelled"
+        : error instanceof ProviderTimeoutError
+          ? "timeout"
+          : error instanceof ProviderConnectionError
+            ? "connection"
+            : error instanceof MapCapacityError
+              ? "capacity"
+              : "response";
+      throw error;
+    } finally {
+      // Fixed labels only: never log coordinates, queries, provider URLs or raw errors.
+      try {
+        log({
+          event: "map_provider",
+          provider: label,
+          outcome,
+          durationMs: Math.max(0, Date.now() - started),
+        });
+      } catch {
+        /* Logging must not break routing. */
+      }
+    }
+  };
   try {
-    return await read(primary);
+    return await read(primary, process.env.OVERPASS_URL ? "custom" : "primary");
   } catch (error) {
     signal.throwIfAborted();
-    // One sequential fallback for an unreachable default host, within the same
-    // area deadline. Never bypass throttling or send custom-provider data elsewhere.
-    if (!(error instanceof ProviderConnectionError) || process.env.OVERPASS_URL)
+    // Each provider gets its own bounded attempt; both fit inside the total
+    // search deadline. Never bypass throttling or leak custom-provider queries.
+    if (
+      !(
+        error instanceof ProviderConnectionError ||
+        error instanceof ProviderTimeoutError
+      ) ||
+      process.env.OVERPASS_URL
+    )
       throw error;
-    return read(new URL("https://overpass.private.coffee/api/interpreter"));
+    return read(
+      new URL("https://overpass.private.coffee/api/interpreter"),
+      "backup",
+    );
   }
 }
 export type AreaLoader = (
@@ -129,7 +173,7 @@ export async function searchLoops(
         const elements = await load(
           area,
           AbortSignal.any([
-            AbortSignal.timeout(Math.min(40000, remaining)),
+            AbortSignal.timeout(Math.min(PROVIDER_TIMEOUT_MS * 2, remaining)),
             ...(signal ? [signal] : []),
           ]),
         );
@@ -177,7 +221,7 @@ export async function searchLoops(
         }
         // Keep an already-computed real route if a later improvement query fails.
         if (best && e instanceof ProviderError) return best;
-        // Throttling/timeouts are not a reason to hammer another public endpoint.
+        // Provider attempts are exhausted; do not retry another area.
         throw e;
       }
     }

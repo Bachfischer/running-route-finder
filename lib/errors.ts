@@ -28,3 +28,10 @@ export class ProviderConnectionError extends ProviderError {
     this.name = "ProviderConnectionError";
   }
 }
+
+export class ProviderTimeoutError extends ProviderError {
+  constructor() {
+    super("The map service timed out. Please try again.");
+    this.name = "ProviderTimeoutError";
+  }
+}

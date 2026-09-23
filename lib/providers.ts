@@ -2,7 +2,9 @@ import {
   MapCapacityError,
   ProviderError,
   ProviderConnectionError,
+  ProviderTimeoutError,
 } from "./errors.ts";
+export const PROVIDER_TIMEOUT_MS = 40000;
 export type Fetcher = typeof fetch;
 export function provider(name: string, fallback: string) {
   const u = new URL(process.env[name] || fallback);
@@ -51,7 +53,7 @@ export async function jsonFetch(
 ): Promise<unknown> {
   let res: Response;
   const signal = AbortSignal.any([
-    AbortSignal.timeout(40000),
+    AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     ...(init.signal ? [init.signal] : []),
   ]);
   try {
@@ -67,7 +69,7 @@ export async function jsonFetch(
     });
   } catch (e) {
     if (e instanceof Error && ["AbortError", "TimeoutError"].includes(e.name))
-      throw new ProviderError("The map service timed out. Please try again.");
+      throw new ProviderTimeoutError();
     throw new ProviderConnectionError();
   }
   if (!res.ok) {
@@ -82,7 +84,7 @@ export async function jsonFetch(
   } catch (e) {
     if (e instanceof MapCapacityError || e instanceof ProviderError) throw e;
     if (e instanceof Error && ["AbortError", "TimeoutError"].includes(e.name))
-      throw new ProviderError("The map service timed out. Please try again.");
+      throw new ProviderTimeoutError();
     throw new ProviderError(
       "The map service returned incomplete data. Please try again.",
     );
