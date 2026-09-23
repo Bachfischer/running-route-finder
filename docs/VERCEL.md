@@ -63,7 +63,7 @@ Wait for Vercel to validate the domain and issue TLS. Check that the domain is a
 | Preview returns 401 or Vercel login                   | Sign in with an authorized account to test the preview. Do not disable deployment protection or treat the login page as an app failure.                                          |
 | App returns “Could not connect…” / “Could not reach…” | The outbound provider request failed. Inspect Production environment overrides and Vercel runtime logs; this message alone does not distinguish DNS, TLS or connection failures. |
 | App returns map timeout or busy error                 | The provider/query deadline or an upstream HTTP failure was reached. Respect rate limits. Do not repeatedly retry or blindly increase the function timeout.                      |
-| App returns 429                                       | Respect `Retry-After`. Check both app cooldowns and provider capacity.                                                                                                           |
+| App returns 429                                       | Respect `Retry-After`. Check the provider's quota or any Vercel Firewall limits.                                                                                                 |
 
 For a failed live request, retain the UTC time, deployment SHA, HTTP status, duration, `X-Request-ID` and `X-Vercel-ID` from the response headers. In the project's **Logs** view, select Production and filter `POST /api/loops` around that time. Build logs are a different view. Application logs contain status/duration and the application request ID. Within the same invocation, `map_provider` events report `primary`, `backup` or `custom`, an outcome (`success`, `timeout`, `connection`, `cancelled`, `capacity` or `response`) and duration, without provider URLs, coordinates or raw exceptions. A primary timeout followed by backup success demonstrates failover; two timeouts still mean live routing failed. The earlier 40,007 ms application failure matched its map deadline, not the 180-second Vercel function limit. Share only relevant redacted logs—never cookies, tokens or private address searches.
 
@@ -87,7 +87,7 @@ For the original Overpass engine, Vercel Runtime Cache shares compressed map are
 
 The recorded Munich production-server test verifies a 10.26 km closed loop, over 88% mapped green space, over 98% paths, under 5% repeat and no mapped signals, crossings, barriers, railway crossings or stairs. It also verifies two searches require one Overpass download. This exercises production packaging with recorded external data, not Vercel's remote cache service or present-day path conditions.
 
-The cooldown uses Vercel's `x-real-ip` header. Cooldowns and the in-flight guard are best-effort per instance, not distributed rate limiting. On another Node host, a trusted reverse proxy must overwrite that header. Configure Vercel Firewall rate limits and suitable map providers before broad public traffic; public Overpass/Photon services can throttle.
+There is no application-wide wait between searches or single-request guard. Independent route requests can execute concurrently across devices and server instances; each request consumes provider capacity. Configure Vercel Firewall rate limits and suitable map providers before broad public traffic; public Overpass/Photon services can throttle.
 
 ## Website integration and rollback
 
