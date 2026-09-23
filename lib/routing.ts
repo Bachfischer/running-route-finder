@@ -31,6 +31,9 @@ export type LoopResult = {
   routes: Loop[];
   snapDistance: number;
   candidates: number;
+  source?: "openrouteservice";
+  /** ORS green and quiet scores are estimates, not mapped park coverage. */
+  quality?: { green: number | null; quiet: number | null }[];
 };
 type Edge = {
   to: number;

@@ -700,13 +700,31 @@ export default function Home() {
                 </div>
               </div>
               <div className="route-facts">
-                <span>
-                  {Math.round(chosen.parks * 100)}% in mapped green spaces
-                </span>
-                <span>
-                  {chosen.trafficLights} mapped traffic-light encounters
-                </span>
-                <span>{chosen.crossings} mapped crossing sections</span>
+                {result.source === "openrouteservice" ? (
+                  <>
+                    <span>
+                      {result.quality?.[selected]?.green == null
+                        ? "Green rating unavailable"
+                        : `${Math.round(result.quality[selected].green! * 100)}% of route rated green`}
+                    </span>
+                    <span>
+                      {result.quality?.[selected]?.quiet == null
+                        ? "Quiet rating unavailable"
+                        : `${Math.round(result.quality[selected].quiet! * 100)}% of route rated quiet`}
+                    </span>
+                    <span>Stairs avoided where mapped</span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {Math.round(chosen.parks * 100)}% in mapped green spaces
+                    </span>
+                    <span>
+                      {chosen.trafficLights} mapped traffic-light encounters
+                    </span>
+                    <span>{chosen.crossings} mapped crossing sections</span>
+                  </>
+                )}
               </div>
               {result.routes.length > 1 && (
                 <details className="alternative-options">
@@ -737,35 +755,51 @@ export default function Home() {
               </Button>
               <details className="recommendation-details">
                 <summary>Why this loop?</summary>
-                <p>
-                  We favor mapped parks and fewer interruptions: traffic lights,
-                  road and railway crossings, gates, stairs, and sharp turns.
-                  Distance, repeated paths and direction also affect the choice.
-                  This is the best candidate found, not a guaranteed stop-free
-                  route.
-                </p>
-                <div className="route-facts detail-facts">
-                  <span>
-                    {(chosen.repeat * 100).toFixed(1)}% repeated distance
-                  </span>
-                  <span>{Math.round(chosen.paths * 100)}% paths & tracks</span>
-                  <span>
-                    Loop heads{" "}
-                    {directions[1 + (Math.round(chosen.bearing / 45) % 8)]}
-                  </span>
-                  <span>{chosen.barriers} mapped barriers</span>
-                  <span>
-                    {chosen.railwayCrossings} mapped railway crossings
-                  </span>
-                  <span>{Math.round(chosen.steps)} m of stairs</span>
-                  <span>{chosen.sharpTurns} sharp junction turns</span>
-                </div>
-                <p>
-                  Green-space coverage comes from mapped boundaries; unmapped
-                  obstacles cannot be counted. Adjacent crossing markings are
-                  grouped into sections; these are not predicted stops or
-                  waiting times.
-                </p>
+                {result.source === "openrouteservice" ? (
+                  <p>
+                    Four seeded walking loops are requested with green and quiet
+                    preferences and mapped stairs avoided. We rank the returned
+                    routes by target distance, direction and green/quiet
+                    ratings. Ratings describe route segments, not park
+                    boundaries. Traffic lights and crossings are not counted by
+                    this provider; a stop-free run cannot be guaranteed. Check
+                    the map and local signs.
+                  </p>
+                ) : (
+                  <>
+                    <p>
+                      We favor mapped parks and fewer interruptions: traffic
+                      lights, road and railway crossings, gates, stairs, and
+                      sharp turns. Distance, repeated paths and direction also
+                      affect the choice. This is the best candidate found, not a
+                      guaranteed stop-free route.
+                    </p>
+                    <div className="route-facts detail-facts">
+                      <span>
+                        {(chosen.repeat * 100).toFixed(1)}% repeated distance
+                      </span>
+                      <span>
+                        {Math.round(chosen.paths * 100)}% paths & tracks
+                      </span>
+                      <span>
+                        Loop heads{" "}
+                        {directions[1 + (Math.round(chosen.bearing / 45) % 8)]}
+                      </span>
+                      <span>{chosen.barriers} mapped barriers</span>
+                      <span>
+                        {chosen.railwayCrossings} mapped railway crossings
+                      </span>
+                      <span>{Math.round(chosen.steps)} m of stairs</span>
+                      <span>{chosen.sharpTurns} sharp junction turns</span>
+                    </div>
+                    <p>
+                      Green-space coverage comes from mapped boundaries;
+                      unmapped obstacles cannot be counted. Adjacent crossing
+                      markings are grouped into sections; these are not
+                      predicted stops or waiting times.
+                    </p>
+                  </>
+                )}
               </details>
               <p className="route-note">
                 {result.snapDistance > 30

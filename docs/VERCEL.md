@@ -4,7 +4,7 @@
 
 1. Merge reviewed changes only after **Quality and routing regressions** passes. In GitHub Settings → Rules → Rulesets (or branch protection), require that check and pull requests for `main`; prevent bypass/direct pushes where your GitHub plan permits.
 2. In Vercel, choose Add New → Project and import `Bachfischer/running-route-finder`. Authorize the Vercel GitHub app for this repository. Keep Framework **Next.js**, root **./**, Node **24.x**, production branch **main**, and Fluid Compute enabled. Use the committed install/build settings; no output-directory override.
-3. Deploy. No provider API keys, database, Cloudflare account, or GitHub deployment secrets are required. Optional `OVERPASS_URL` and `PHOTON_URL` environment variables override the default HTTPS providers; configure Preview and Production separately. No credentials in URLs.
+3. Create a free openrouteservice API key at [HeiGIT](https://account.heigit.org/). In Vercel Project → Settings → Environment Variables, set `ORS_API_KEY` as a sensitive server-side value for both Preview and Production, then redeploy both. Never put the key in Git, a URL, `NEXT_PUBLIC_*`, or chat. Without a key the public Overpass engine remains available, but its hosts have timed out in production. No database is required.
 4. Verify the deployment URL using `pnpm test:deployment https://YOUR-DEPLOYMENT.vercel.app`. Then select the Munich example and request 10 km. Smoke checks use no public map request; the interactive run deliberately does.
 5. Add `run.bachfischer.me` under Settings → Domains. Apply the DNS record Vercel displays and wait for domain/TLS verification. Keep the existing website's apex DNS and GitHub Pages deployment intact.
 
@@ -12,14 +12,15 @@ Build success is not a launch acceptance test: the fixture-based CI suite does n
 
 ## Environment variables
 
-No `.env` file is required and no secrets need to be uploaded. For local overrides use an uncommitted `.env.local`; for Vercel use project environment settings, selecting Preview and/or Production explicitly, then deploy a new version.
+Copy `.env.example` to an uncommitted `.env.local` for local live routing, or set the key in Vercel project environment settings for Preview and Production separately, then deploy a new version. Deterministic tests need no key.
 
-| Variable       | Default                                   | When to set it                                     |
-| -------------- | ----------------------------------------- | -------------------------------------------------- |
-| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | A tested, compatible HTTPS map provider            |
-| `PHOTON_URL`   | `https://photon.komoot.io/api/`           | A tested, compatible HTTPS address-search provider |
+| Variable       | Default                                   | When to set it                                         |
+| -------------- | ----------------------------------------- | ------------------------------------------------------ |
+| `ORS_API_KEY`  | unset                                     | Recommended: enables managed green/quiet walking loops |
+| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | A tested, compatible HTTPS map provider                |
+| `PHOTON_URL`   | `https://photon.komoot.io/api/`           | A tested, compatible HTTPS address-search provider     |
 
-Leave both unset initially. A connection failure or timeout at the default Overpass host triggers one sequential attempt at `https://overpass.private.coffee/api/interpreter`. Each provider has a fresh timeout of up to 40 seconds, within an 80-second area budget capped by the remaining 110-second search deadline. This is not a guarantee of availability. HTTP errors, throttling, cancellation and invalid data do not trigger failover. Setting **any** `OVERPASS_URL` disables the public fallback, even if it equals the default URL; this protects queries intended for custom providers. Do not put credentials into either URL or set `VERCEL` yourself.
+With `ORS_API_KEY` set, routing uses the openrouteservice foot-walking round-trip API at `api.heigit.org`. At most four candidate requests prefer green, quiet paths and avoid mapped stairs/ferries; distance, direction and green/quiet ratings rank the results. A user request can consume up to four free-tier provider calls. ORS cannot guarantee a stop-free route or count traffic lights. Without the key, a connection failure or timeout at the default Overpass host triggers one sequential attempt at `https://overpass.private.coffee/api/interpreter`. Each provider has a fresh timeout of up to 40 seconds. HTTP errors, throttling, cancellation and invalid data do not trigger failover. Setting **any** `OVERPASS_URL` disables the public fallback. Do not put credentials into either URL or set `VERCEL` yourself.
 
 ## Cloudflare DNS and the production domain
 

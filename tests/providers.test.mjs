@@ -121,6 +121,20 @@ test("malformed JSON rejected", async () => {
     ProviderError,
   );
 });
+test("a rejected routing key gives an actionable error without exposing the key", async () => {
+  await assert.rejects(
+    jsonFetch(
+      "https://example.com",
+      { headers: { Authorization: "private-token" } },
+      100,
+      async () => new Response("unauthorized", { status: 401 }),
+    ),
+    (error) =>
+      error instanceof ProviderError &&
+      error.message.includes("ORS_API_KEY") &&
+      !error.message.includes("private-token"),
+  );
+});
 test("JSON size limit remains typed for adaptive retry", async () => {
   await assert.rejects(
     jsonFetch("https://example.com", {}, 5, async () => new Response("123456")),

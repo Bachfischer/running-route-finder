@@ -19,7 +19,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm start --hostname 127.0.0.1 --port 8787",
+    command:
+      "node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 8787",
     url: "http://127.0.0.1:8787",
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
