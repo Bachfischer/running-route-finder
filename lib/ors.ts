@@ -11,7 +11,8 @@ import { jsonFetch, type Fetcher } from "./providers.ts";
 
 const endpoint =
   "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson";
-const seeds = [1, 2, 3, 4];
+// Separate seeds sample substantially different round trips in dense cities.
+const seeds = [5, 17, 41, 101];
 type Extra = { values?: unknown };
 type Feature = {
   geometry?: { coordinates?: unknown };
@@ -126,7 +127,7 @@ export function parseRoute(
   return { route, green, quiet };
 }
 
-/** Four bounded, deterministic alternatives; no unbounded Overpass downloads. */
+/** Four alternatives and at most one length correction; no Overpass download. */
 export async function searchOrs(
   input: RouteInput,
   key: string,
@@ -140,33 +141,44 @@ export async function searchOrs(
   const start: Coord = [input.lon, input.lat];
   const target = input.distance * 1000;
   const requested = compass[input.direction];
-  const found: ReturnType<typeof parseRoute>[] = [];
-  for (const seed of seeds) {
+  // ORS green/quiet preferences often yield a longer actual route than the
+  // round-trip length hint. The correction below handles other areas.
+  const requestedLength = Math.round(target * 0.5);
+  const found: (ReturnType<typeof parseRoute> & { seed: number })[] = [];
+  let lastTimeout: ProviderTimeoutError | undefined;
+  const request = async (seed: number, length: number) => {
     signal.throwIfAborted();
-    let data: unknown;
-    try {
-      data = await jsonFetch(
-        endpoint,
-        {
-          method: "POST",
-          signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]),
-          headers: { Authorization: key, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            coordinates: [start],
-            instructions: false,
-            extra_info: ["green", "noise"],
-            options: {
-              round_trip: { length: target, points: 3, seed },
-              avoid_features: ["steps", "ferries"],
-              profile_params: {
-                weightings: { green: { factor: 1 }, quiet: { factor: 1 } },
-              },
-            },
-          }),
+    const data = await jsonFetch(
+      endpoint,
+      {
+        method: "POST",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(18000)]),
+        headers: {
+          Authorization: key,
+          "Content-Type": "application/json",
+          Accept: "application/geo+json",
         },
-        2_000_000,
-        fetcher,
-      );
+        body: JSON.stringify({
+          coordinates: [start],
+          instructions: false,
+          extra_info: ["green", "noise"],
+          options: {
+            round_trip: { length, points: 3, seed },
+            avoid_features: ["steps", "ferries"],
+            profile_params: {
+              weightings: { green: 1, quiet: 1 },
+            },
+          },
+        }),
+      },
+      2_000_000,
+      fetcher,
+    );
+    return { ...parseRoute(data, start, target, requested), seed };
+  };
+  for (const seed of seeds) {
+    try {
+      found.push(await request(seed, requestedLength));
     } catch (error) {
       signal.throwIfAborted();
       if (error instanceof ProviderError && error.status === 429)
@@ -174,24 +186,46 @@ export async function searchOrs(
           "Routing service quota reached. Please try again later.",
           429,
         );
+      if (error instanceof ProviderTimeoutError && !found.length) {
+        lastTimeout = error;
+        continue;
+      }
       if (error instanceof ProviderError && found.length) break;
-      if (error instanceof ProviderTimeoutError)
-        throw new ProviderTimeoutError();
       throw error;
     }
-    found.push(parseRoute(data, start, target, requested));
     if (
       found.at(-1)!.route.score < -0.5 &&
       Math.abs(found.at(-1)!.route.distance - target) / target < 0.08
     )
       break;
   }
+  if (!found.length && lastTimeout) throw lastTimeout;
   if (!found.length)
     throw new RouteError(
       "NO_LOOP",
       "No walking loop found here. Try a nearby start.",
     );
   found.sort((a, b) => a.route.score - b.route.score);
+  const best = found[0];
+  if (Math.abs(best.route.distance - target) / target > 0.12) {
+    const correction = Math.round(
+      Math.min(
+        target * 1.25,
+        Math.max(
+          target * 0.25,
+          (requestedLength * target) / best.route.distance,
+        ),
+      ),
+    );
+    try {
+      found.push(await request(best.seed, correction));
+      found.sort((a, b) => a.route.score - b.route.score);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (error instanceof ProviderError && error.status === 429) throw error;
+      // A valid route is preferable to failing a search after an optional correction.
+    }
+  }
   return {
     routes: found.map((r) => r.route),
     quality: found.map((r) => ({ green: r.green, quiet: r.quiet })),

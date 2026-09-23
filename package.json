@@ -13,7 +13,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:coverage": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-include=\"lib/*.ts\" --test-coverage-lines=90 --test-coverage-functions=90 --test-coverage-branches=80 tests/*.test.mjs",
     "test:memory": "node --max-old-space-size=96 --experimental-strip-types scripts/test-memory.mjs",
-    "test:live": "node --experimental-strip-types scripts/live-smoke.mjs",
+    "test:live": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/live-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",

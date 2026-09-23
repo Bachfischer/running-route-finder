@@ -135,6 +135,22 @@ test("a rejected routing key gives an actionable error without exposing the key"
       !error.message.includes("private-token"),
   );
 });
+for (const status of [400, 406])
+  test(`authenticated HTTP ${status} explains incompatible route request`, async () => {
+    await assert.rejects(
+      jsonFetch(
+        "https://example.com",
+        { headers: { Authorization: "private-token" } },
+        100,
+        async () => new Response("private provider details", { status }),
+      ),
+      (error) =>
+        error instanceof ProviderError &&
+        error.status === 502 &&
+        error.message.includes("route request") &&
+        !error.message.includes("private"),
+    );
+  });
 test("JSON size limit remains typed for adaptive retry", async () => {
   await assert.rejects(
     jsonFetch("https://example.com", {}, 5, async () => new Response("123456")),

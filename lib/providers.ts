@@ -59,7 +59,7 @@ export async function jsonFetch(
   try {
     const headers = new Headers(init.headers);
     headers.set("User-Agent", "LoopRunningRouteFinder/1.1");
-    headers.set("Accept", "application/json");
+    if (!headers.has("Accept")) headers.set("Accept", "application/json");
     res = await fetcher(url, {
       ...init,
       signal,
@@ -74,12 +74,18 @@ export async function jsonFetch(
   }
   if (!res.ok) {
     await res.body?.cancel();
+    const authenticated = new Headers(init.headers).has("Authorization");
     throw new ProviderError(
-      (res.status === 401 || res.status === 403) &&
-        new Headers(init.headers).has("Authorization")
+      authenticated && (res.status === 401 || res.status === 403)
         ? "The routing provider rejected its server-side API key. Check ORS_API_KEY in Vercel and redeploy."
-        : "The map data service is busy. Please try again in a minute.",
-      res.status === 429 ? 429 : 503,
+        : authenticated && (res.status === 400 || res.status === 406)
+          ? "The routing provider rejected this route request. Please report the issue."
+          : "The map data service is busy. Please try again in a minute.",
+      res.status === 429
+        ? 429
+        : authenticated && (res.status === 400 || res.status === 406)
+          ? 502
+          : 503,
     );
   }
   try {
