@@ -40,7 +40,7 @@ Security headers disable MIME sniffing and plugin objects, restrict base URLs an
 ## Launch settings still required in the hosting account
 
 1. Require **Quality and routing regressions** before merging and prevent direct main pushes. Vercel native Git deployment does not wait for unrelated Actions jobs.
-2. Configure Vercel Firewall limits for `/api/search` and `/api/loops`, based on expected usage and account capabilities. Instance-local cooldowns and the in-flight guard are not distributed protection. Start conservatively and tune from status/latency metrics.
+2. Configure Vercel Firewall limits for `/api/search` and `/api/loops`, based on expected usage and account capabilities. Requests can run concurrently without an application cooldown; provider quotas still apply. Start conservatively and tune from status/latency metrics.
 3. Confirm provider terms, capacity and attribution for the expected audience. Public Overpass/Photon have no uptime guarantee. A managed or self-hosted provider is the next step for sustained traffic.
 4. Configure monitoring and spending alerts, verify preview/production access, and smoke-test the actual deployed HTTPS URL. Confirm the custom-domain embed separately if enabling it.
 
