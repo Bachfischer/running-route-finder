@@ -68,6 +68,38 @@ export default function Home() {
     resultsRef = useRef<HTMLDivElement>(null);
   const chosen = result?.routes[selected];
   useEffect(() => {
+    if (!embedded || window.parent === window) return;
+    const allowedParents = [
+      "https://bachfischer.me",
+      "https://www.bachfischer.me",
+    ];
+    let parentOrigin: string;
+    try {
+      parentOrigin = new URL(document.referrer).origin;
+    } catch {
+      return;
+    }
+    if (!allowedParents.includes(parentOrigin)) return;
+
+    const reportHeight = () => {
+      window.parent.postMessage(
+        {
+          type: "running-route-finder:resize",
+          height: Math.ceil(document.body.getBoundingClientRect().height),
+        },
+        parentOrigin,
+      );
+    };
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(document.body);
+    window.addEventListener("resize", reportHeight);
+    reportHeight();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", reportHeight);
+    };
+  }, [embedded]);
+  useEffect(() => {
     let alive = true;
     let instance: LeafletMap | null = null;
     import("leaflet")
