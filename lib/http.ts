@@ -1,5 +1,4 @@
 import {
-  createCooldown,
   jsonFetch,
   provider,
   readTextBounded,
@@ -54,15 +53,12 @@ export function failure(e: unknown) {
 type Dependencies = {
   fetcher?: Fetcher;
   search?: (input: RouteInput, signal: AbortSignal) => Promise<LoopResult>;
-  now?: () => number;
 };
 export function createHandlers(deps: Dependencies = {}) {
-  const cooldown = createCooldown(deps.now),
-    fetcher = deps.fetcher || fetch,
+  const fetcher = deps.fetcher || fetch,
     search =
       deps.search ||
       ((input, signal) => searchLoops(input, undefined, undefined, signal));
-  let computing = false;
   return {
     async loops(req: Request) {
       const origin = req.headers.get("origin");
@@ -96,19 +92,6 @@ export function createHandlers(deps: Dependencies = {}) {
           "Choose valid coordinates, a distance from 2 to 25 km, and a compass direction.",
           400,
         );
-      if (computing)
-        return apiError(
-          "Another route is being calculated. Please try again shortly.",
-          429,
-          5,
-        );
-      if (cooldown(req, "loops", 15000))
-        return apiError(
-          "Please wait 15 seconds before requesting another loop.",
-          429,
-          15,
-        );
-      computing = true;
       try {
         req.signal.throwIfAborted();
         return Response.json(await search(body, req.signal), {
@@ -116,8 +99,6 @@ export function createHandlers(deps: Dependencies = {}) {
         });
       } catch (e) {
         return failure(e);
-      } finally {
-        computing = false;
       }
     },
     async location(req: Request) {
@@ -142,8 +123,6 @@ export function createHandlers(deps: Dependencies = {}) {
           { headers: { "Cache-Control": "no-store" } },
         );
       }
-      if (cooldown(req, "search", 1200))
-        return apiError("Please wait a moment before searching again.", 429, 2);
       try {
         const url = provider("PHOTON_URL", "https://photon.komoot.io/api/");
         url.searchParams.set("q", q);
