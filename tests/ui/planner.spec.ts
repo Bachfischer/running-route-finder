@@ -455,9 +455,7 @@ test("standalone planner explains its purpose without blog navigation", async ({
   await expect(
     page.getByRole("navigation", { name: "Main navigation" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByText(/Choose your starting point and distance/),
-  ).toBeVisible();
+  await expect(page.getByText(/A better way out the door/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeVisible();
