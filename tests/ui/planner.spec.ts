@@ -53,8 +53,15 @@ test("Munich example sets start, 10 km and north", async ({ page }) => {
     "Odeonsplatz, Munich",
   );
   await expect(page.getByLabel("Target distance")).toHaveValue("10");
-  await page.getByText("Direction: N", { exact: true }).click();
-  await expect(page.getByLabel("Preferred direction")).toHaveValue("N");
+  await expect(
+    page.getByRole("button", { name: "North", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Southwest" }).click();
+  await expect(page.getByRole("button", { name: "Southwest" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "North", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
@@ -273,8 +280,7 @@ test("changing distance or direction clears stale results", async ({
   await page.getByRole("button", { name: "5 km", exact: true }).click();
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
   await find(page);
-  await page.getByText("Direction: N", { exact: true }).click();
-  await page.getByLabel("Preferred direction").selectOption("S");
+  await page.getByRole("button", { name: "South", exact: true }).click();
   await expect(page.getByLabel("Route recommendation")).toHaveCount(0);
 });
 test("alternatives update selection and GPX exports the selected coordinates", async ({
@@ -383,13 +389,16 @@ for (const name of ["Running route finder", "Launch route finder"]) {
   });
 }
 
-test("default setup keeps optional direction out of the primary form", async ({
+test("default direction is best available and compass choices are visible", async ({
   page,
 }) => {
   await expect(page.getByLabel("Target distance")).toHaveValue("10");
-  await expect(page.getByLabel("Preferred direction")).toBeHidden();
-  await page.getByText("Direction: best available", { exact: true }).click();
-  await expect(page.getByLabel("Preferred direction")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Preferred direction" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Best available" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 test("one matching address needs only the find button", async ({ page }) => {
   await mockRoutes(page);

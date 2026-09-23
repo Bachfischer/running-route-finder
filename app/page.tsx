@@ -13,6 +13,7 @@ import {
   LoaderCircle,
   ArrowRight,
   Flag,
+  Compass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,17 @@ import type { LoopResult } from "@/lib/routing";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
 const directions = ["Any", "N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const compassPoints = [
+  { value: "NW", label: "Northwest" },
+  { value: "N", label: "North" },
+  { value: "NE", label: "Northeast" },
+  { value: "W", label: "West" },
+  { value: "Any", label: "Best available" },
+  { value: "E", label: "East" },
+  { value: "SW", label: "Southwest" },
+  { value: "S", label: "South" },
+  { value: "SE", label: "Southeast" },
+];
 export default function Home() {
   const [query, setQuery] = useState(""),
     [place, setPlace] = useState<Place | null>(null),
@@ -322,11 +334,13 @@ export default function Home() {
       {!embedded && (
         <>
           <div className="project-heading">
+            <div className="heading-kicker">
+              <Compass size={15} /> THE RUNNING ROUTE FINDER
+            </div>
             <h1>Running route finder</h1>
             <p>
-              Choose your starting point and distance. Find a circular running
-              route that prefers parks and quieter paths, avoids mapped
-              interruptions, and brings you back to the start.
+              A better way out the door. Find a loop from wherever you are, with
+              more green space and fewer interruptions along the way.
             </p>
           </div>
         </>
@@ -334,12 +348,16 @@ export default function Home() {
       <div className="workspace">
         <aside className="sidebar">
           <div className="intro">
+            <span className="intro-kicker">YOUR ROUTE, YOUR WAY</span>
             <h2>Plan your run</h2>
+            <p>
+              Set your start, pick a distance, and head in a direction you like.
+            </p>
           </div>
           <div className="form">
             <fieldset disabled={busy || !hydrated}>
               <label htmlFor="location" className="field-label">
-                Starting point
+                <span className="step-number">01</span> Starting point
               </label>
               <form
                 onSubmit={(e) => {
@@ -436,7 +454,7 @@ export default function Home() {
               )}
               <div className="distance-label">
                 <label htmlFor="distance" className="field-label">
-                  Target distance
+                  <span className="step-number">02</span> Target distance
                 </label>
                 <span>2–25 km</span>
               </div>
@@ -501,45 +519,53 @@ export default function Home() {
                   </Button>
                 ))}
               </div>
-              <details className="direction-options">
-                <summary>
-                  Direction:{" "}
-                  {direction === "Any" ? "best available" : direction}
-                </summary>
-                <label htmlFor="direction" className="field-label">
-                  Preferred direction
-                </label>
-                <select
-                  id="direction"
-                  value={direction}
-                  onChange={(e) => {
-                    setDirection(e.target.value);
-                    setResult(null);
-                  }}
-                >
-                  {directions.map((d) => (
-                    <option key={d} value={d}>
-                      {d === "Any"
-                        ? "Best available"
-                        : (
-                            {
-                              N: "North",
-                              NE: "Northeast",
-                              E: "East",
-                              SE: "Southeast",
-                              S: "South",
-                              SW: "Southwest",
-                              W: "West",
-                              NW: "Northwest",
-                            } as Record<string, string>
-                          )[d]}
-                    </option>
-                  ))}
-                </select>
-                <p className="field-hint">
-                  Choose a side of your start to explore.
-                </p>
-              </details>
+              <div className="direction-options">
+                <div className="field-label" id="direction-label">
+                  <span className="step-number">03</span> Preferred direction
+                  <span className="optional">Optional</span>
+                </div>
+                <div className="compass-layout">
+                  <div
+                    className="compass"
+                    role="group"
+                    aria-labelledby="direction-label"
+                  >
+                    {compassPoints.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={
+                          value === "Any" ? "compass-center" : "compass-point"
+                        }
+                        aria-label={label}
+                        aria-pressed={direction === value}
+                        onClick={() => {
+                          setDirection(value);
+                          setResult(null);
+                        }}
+                      >
+                        {value === "Any" ? (
+                          <Compass size={21} strokeWidth={1.8} />
+                        ) : (
+                          value
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="compass-copy">
+                    <strong>
+                      {direction === "Any"
+                        ? "Anywhere is good"
+                        : `Head ${compassPoints.find((point) => point.value === direction)?.label.toLowerCase()}`}
+                    </strong>
+                    <span>
+                      {direction === "Any"
+                        ? "We'll find the best loop around your start."
+                        : "We'll look for a loop on this side of your start."}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </fieldset>
             <Button
               className="find-button"
@@ -617,7 +643,7 @@ export default function Home() {
             )}
             <div className="map-label">
               <MapPin size={15} />
-              {place ? "Your starting point" : "Explore Munich"}
+              {place ? "Your starting point" : "Explore the map"}
               <span> / </span>
               {chosen ? "Your loop" : "Click the map to set a start"}
             </div>
