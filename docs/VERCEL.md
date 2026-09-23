@@ -30,6 +30,7 @@ Wait for Vercel to validate the domain and issue TLS. Check that the domain is a
 ## Verify every production deployment
 
 1. In Vercel Deployments, check the **commit SHA** and wait for Ready. A merged PR is not necessarily live yet. Redeploying an old failed commit does not deploy the fix.
+   If GitHub `main` has advanced but the production alias still points to an older SHA, inspect the project's Git connection and production branch (`main`). Create a new **Production** deployment from the current `main` commit after repairing the integration. A GitHub Actions rerun checks code but does not publish it; a successful Preview build also does not move the production alias.
 2. Open `https://run.bachfischer.me` in a fresh page. Confirm there are no blog tabs, the description starts with “Choose your starting point and distance”, and the button says “Find a running route”. These markers distinguish the standalone version from the earlier page, not every subsequent commit.
 3. Run the inexpensive smoke check:
 
