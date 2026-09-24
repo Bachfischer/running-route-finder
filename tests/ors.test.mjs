@@ -6,6 +6,10 @@ import { createHandlers } from "../lib/http.ts";
 
 const input = { lat: 48.142, lon: 11.577, distance: 10, direction: "N" };
 const origin = [input.lon, input.lat];
+const noParks = (fetcher) => (url, init) =>
+  String(url).includes("openpoiservice")
+    ? Response.json({ type: "FeatureCollection", features: [] })
+    : fetcher(url, init);
 function sample(north = true, distance = 10100) {
   return {
     features: [
@@ -54,9 +58,9 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     input,
     "example-secret",
     new AbortController().signal,
-    fetcher,
+    noParks(fetcher),
   );
-  assert.ok(calls.length >= 1 && calls.length <= 5);
+  assert.equal(calls.length, 4);
   assert.ok(
     calls[0].url.startsWith("https://api.heigit.org/openrouteservice/"),
   );
@@ -71,7 +75,7 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     quiet: 1,
   });
   assert.deepEqual(calls[0].body.options.avoid_features, ["steps", "ferries"]);
-  assert.deepEqual(calls[0].body.extra_info, ["green", "noise"]);
+  assert.deepEqual(calls[0].body.extra_info, ["green", "noise", "waytype"]);
   assert.equal(result.routes[0].distance, 10100);
   assert.deepEqual(
     result.routes[0].coordinates[0],
@@ -85,17 +89,81 @@ test("direction ranks a northern loop ahead of an equally distant southern loop"
   const south = parseRoute(sample(false), origin, 10000, 0);
   assert.ok(north.route.score < south.route.score);
 });
+test("Odeonsplatz favors park paths over a shorter street loop", async () => {
+  const street = sample(false, 10000);
+  street.features[0].properties.extras.green.values = [[0, 3, 2]];
+  street.features[0].properties.extras.noise.values = [[0, 3, 8]];
+  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
+  const park = sample(true, 11200);
+  park.features[0].properties.extras.green.values = [[0, 3, 9]];
+  park.features[0].properties.extras.noise.values = [[0, 3, 1]];
+  park.features[0].properties.extras.waytypes = { values: [[0, 3, 4]] };
+  let calls = 0;
+  const result = await searchOrs(
+    { ...input, direction: "S" },
+    "test-key",
+    new AbortController().signal,
+    noParks(async () => Response.json(++calls === 2 ? park : street)),
+  );
+  assert.equal(calls, 4);
+  assert.equal(result.routes[0].distance, 11200);
+  assert.equal(result.quality[0].green, 1);
+  assert.equal(result.quality[0].quiet, 1);
+});
+test("Odeonsplatz generates a route through a nearby mapped park", async () => {
+  const park = [11.586, 48.16];
+  const calls = [];
+  const route = sample(true, 10500);
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    async (url, init) => {
+      const body = JSON.parse(init.body);
+      calls.push({ url: String(url), body });
+      return Response.json(
+        String(url).includes("openpoiservice")
+          ? { features: [{ geometry: { type: "Point", coordinates: park } }] }
+          : route,
+      );
+    },
+  );
+  assert.equal(calls[0].body.filters.category_ids[0], 280);
+  assert.ok(calls[0].body.geometry.buffer <= 1900);
+  assert.ok(calls[0].body.geometry.geojson.coordinates[1] > origin[1]);
+  assert.equal(calls[1].body.options.round_trip, undefined);
+  assert.equal(calls[1].body.options.profile_params, undefined);
+  assert.equal(calls[1].body.coordinates.length, 4);
+  assert.deepEqual(calls[1].body.coordinates[0], origin);
+  assert.deepEqual(calls[1].body.coordinates.at(-1), origin);
+  assert.ok(calls[1].body.coordinates[2][1] > park[1]);
+  assert.equal(result.routes[0].distance, 10500);
+});
+test("park paths remain useful when green and noise data are unavailable", () => {
+  const street = sample(true);
+  const path = sample(true, 10900);
+  delete street.features[0].properties.extras.green;
+  delete street.features[0].properties.extras.noise;
+  delete path.features[0].properties.extras.green;
+  delete path.features[0].properties.extras.noise;
+  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
+  path.features[0].properties.extras.waytypes = { values: [[0, 3, 7]] };
+  assert.ok(
+    parseRoute(path, origin, 10000, undefined).route.score <
+      parseRoute(street, origin, 10000, undefined).route.score,
+  );
+});
 test("widely spaced seeds and one bounded correction improve an overshot loop", async () => {
   const calls = [];
   const result = await searchOrs(
     input,
     "test-key",
     new AbortController().signal,
-    async (_url, init) => {
+    noParks(async (_url, init) => {
       const roundTrip = JSON.parse(init.body).options.round_trip;
       calls.push(roundTrip);
       return Response.json(sample(true, calls.length === 5 ? 10200 : 15000));
-    },
+    }),
   );
   assert.deepEqual(
     calls.slice(0, 4).map((c) => c.seed),
@@ -175,10 +243,11 @@ test("a later provider outage preserves an already valid candidate", async () =>
     input,
     "token",
     new AbortController().signal,
-    async () =>
+    noParks(async () =>
       ++calls === 1
         ? Response.json(sample(false, 15000))
         : new Response("busy", { status: 503 }),
+    ),
   );
   assert.equal(calls, 3);
   assert.equal(found.routes.length, 1);
@@ -189,10 +258,10 @@ test("a timed-out first seed tries another without extending past four attempts"
     input,
     "test-key",
     new AbortController().signal,
-    async () => {
+    noParks(async () => {
       if (++calls === 1) throw new DOMException("slow", "TimeoutError");
       return Response.json(sample(true, 10100));
-    },
+    }),
   );
   assert.equal(result.routes[0].distance, 10100);
   assert.ok(calls <= 4);
@@ -201,10 +270,15 @@ test("a timed-out first seed tries another without extending past four attempts"
 test("four timed-out seeds fail with a useful timeout", async () => {
   let calls = 0;
   await assert.rejects(
-    searchOrs(input, "test-key", new AbortController().signal, async () => {
-      calls++;
-      throw new DOMException("slow", "TimeoutError");
-    }),
+    searchOrs(
+      input,
+      "test-key",
+      new AbortController().signal,
+      noParks(async () => {
+        calls++;
+        throw new DOMException("slow", "TimeoutError");
+      }),
+    ),
     ProviderTimeoutError,
   );
   assert.equal(calls, 4);

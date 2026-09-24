@@ -11,6 +11,7 @@ import { jsonFetch, type Fetcher } from "./providers.ts";
 
 const endpoint =
   "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson";
+const parksEndpoint = "https://api.heigit.org/openpoiservice/v0/pois";
 // Separate seeds sample substantially different round trips in dense cities.
 const seeds = [5, 17, 41, 101];
 type Extra = { values?: unknown };
@@ -20,6 +21,10 @@ type Feature = {
     summary?: { distance?: unknown };
     extras?: Record<string, Extra>;
   };
+};
+type ParkFeature = {
+  geometry?: { type?: unknown; coordinates?: unknown };
+  properties?: { osm_tags?: { name?: string } };
 };
 
 function bearing(start: Coord, point: Coord) {
@@ -104,17 +109,156 @@ export function parseRoute(
   const extras = feature?.properties?.extras;
   const green = quality(extras?.green, coordinates, (v) => v >= 7);
   const quiet = quality(extras?.noise, coordinates, (v) => v <= 3);
+  // ORS calls this response field `waytypes` even though the request is `waytype`.
+  const paths = quality(extras?.waytypes ?? extras?.waytype, coordinates, (v) =>
+    [4, 5, 7].includes(v),
+  );
+  const relativeError = Math.abs((distance as number) - target) / target;
   const route: Loop = {
     coordinates,
     distance: distance as number,
     bearing: heading,
+    // Prefer green routes with actual running paths. Allow modest length and
+    // direction deviations rather than ranking a street loop first.
     score:
-      (Math.abs((distance as number) - target) / target) * 3 +
-      (angle / 180) * 2 -
-      (green ?? 0) * 0.8 -
-      (quiet ?? 0) * 0.3,
+      relativeError * 0.5 +
+      Math.max(0, relativeError - 0.15) * 8 +
+      (angle / 180) * 0.25 -
+      (green ?? 0) * 3 -
+      (paths ?? 0) * 1.5 -
+      (quiet ?? 0) * 0.7,
   };
-  return { route, green, quiet };
+  return { route, green, quiet, paths };
+}
+
+/** Find a park far enough away to spend the run there, rather than circling a tiny square. */
+export async function findParks(
+  start: Coord,
+  target: number,
+  requested: number | undefined,
+  key: string,
+  signal: AbortSignal,
+  fetcher: Fetcher,
+): Promise<Coord[]> {
+  const radius = Math.min(1900, Math.max(700, target * 0.2));
+  const heading = ((requested ?? 0) * Math.PI) / 180;
+  const lookAhead = requested === undefined ? 0 : Math.min(1700, target * 0.17);
+  const center: Coord = [
+    start[0] +
+      (Math.sin(heading) * lookAhead) /
+        (111_200 * Math.cos((start[1] * Math.PI) / 180)),
+    start[1] + (Math.cos(heading) * lookAhead) / 111_200,
+  ];
+  const data = await jsonFetch(
+    parksEndpoint,
+    {
+      method: "POST",
+      signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+      headers: {
+        Authorization: key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        request: "pois",
+        geometry: {
+          geojson: { type: "Point", coordinates: center },
+          buffer: radius,
+        },
+        filters: { category_ids: [280] },
+        limit: 50,
+        sortby: "distance",
+      }),
+    },
+    500_000,
+    async (url, init) => {
+      const response = await fetcher(url, init);
+      console.info("park lookup HTTP", response.status);
+      if (!response.ok)
+        console.warn(
+          "park lookup response",
+          (await response.clone().text()).slice(0, 500),
+        );
+      return response;
+    },
+  );
+  const features = (data as { features?: ParkFeature[] } | null)?.features;
+  console.info(
+    "park lookup result",
+    Array.isArray(features) ? features.length : "invalid",
+  );
+  console.info(
+    "park lookup sample",
+    Array.isArray(features)
+      ? features.slice(0, 5).map((f) => f.geometry)
+      : null,
+  );
+  console.info(
+    "park lookup names",
+    Array.isArray(features)
+      ? features.map((f) => [
+          f.properties?.osm_tags?.name,
+          f.geometry?.coordinates,
+        ])
+      : null,
+  );
+  if (!Array.isArray(features)) return [];
+  const ranked = features
+    .map((feature) => feature.geometry)
+    .filter((geometry): geometry is { type: "Point"; coordinates: Coord } => {
+      const p = geometry?.coordinates;
+      return (
+        geometry?.type === "Point" &&
+        Array.isArray(p) &&
+        p.length === 2 &&
+        p.every((v) => typeof v === "number" && Number.isFinite(v)) &&
+        Math.abs(p[0]) <= 180 &&
+        Math.abs(p[1]) <= 85
+      );
+    })
+    .map((geometry) => geometry.coordinates)
+    .filter(
+      (p) =>
+        meters(start, p) >= target * 0.12 && meters(start, p) <= target * 0.4,
+    )
+    .sort((a, b) => {
+      const preference = (p: Coord) =>
+        Math.abs(meters(start, p) - target * 0.3) +
+        (requested === undefined
+          ? 0
+          : (Math.abs(((bearing(start, p) - requested + 540) % 360) - 180) /
+              180) *
+            target *
+            0.06);
+      return preference(a) - preference(b);
+    });
+  const distinct: Coord[] = [];
+  for (const park of ranked) {
+    if (distinct.every((other) => meters(park, other) > 650))
+      distinct.push(park);
+    if (distinct.length === 4) break;
+  }
+  return distinct;
+}
+
+function parkWaypoints(start: Coord, park: Coord, target: number): Coord[] {
+  const angle = Math.atan2(
+    (park[0] - start[0]) * Math.cos((start[1] * Math.PI) / 180),
+    park[1] - start[1],
+  );
+  const reach = Math.min(
+    1600,
+    Math.max(650, (target - 2 * meters(start, park)) / 2),
+  );
+  const offset = (north: number, east: number): Coord => [
+    park[0] + east / (111_200 * Math.cos((park[1] * Math.PI) / 180)),
+    park[1] + north / 111_200,
+  ];
+  return [
+    start,
+    park,
+    offset(Math.cos(angle) * reach, Math.sin(angle) * reach),
+    start,
+  ];
 }
 
 /** Four alternatives and at most one length correction. */
@@ -136,7 +280,7 @@ export async function searchOrs(
   const requestedLength = Math.round(target * 0.5);
   const found: (ReturnType<typeof parseRoute> & { seed: number })[] = [];
   let lastTimeout: ProviderTimeoutError | undefined;
-  const request = async (seed: number, length: number) => {
+  const request = async (seed: number, length: number, park?: Coord) => {
     signal.throwIfAborted();
     const data = await jsonFetch(
       endpoint,
@@ -149,15 +293,15 @@ export async function searchOrs(
           Accept: "application/geo+json",
         },
         body: JSON.stringify({
-          coordinates: [start],
+          coordinates: park ? parkWaypoints(start, park, target) : [start],
           instructions: false,
-          extra_info: ["green", "noise"],
+          extra_info: ["green", "noise", "waytype"],
           options: {
-            round_trip: { length, points: 3, seed },
+            ...(park ? {} : { round_trip: { length, points: 3, seed } }),
             avoid_features: ["steps", "ferries"],
-            profile_params: {
-              weightings: { green: 1, quiet: 1 },
-            },
+            ...(park
+              ? {}
+              : { profile_params: { weightings: { green: 1, quiet: 1 } } }),
           },
         }),
       },
@@ -166,6 +310,42 @@ export async function searchOrs(
     );
     return { ...parseRoute(data, start, target, requested), seed };
   };
+  // Park waypoints actively take the route inside mapped green space. ORS's
+  // green rating alone can label tree-lined city streets as highly green.
+  let parks: Coord[] = [];
+  try {
+    parks = await findParks(start, target, requested, key, signal, fetcher);
+  } catch (error) {
+    signal.throwIfAborted();
+    console.warn(
+      "park lookup error",
+      error instanceof ProviderError ? error.status : String(error),
+    );
+    if (error instanceof ProviderError && error.status === 429)
+      throw new ProviderError(
+        "Routing service quota reached. Please try again later.",
+        429,
+      );
+  }
+  for (const park of parks) {
+    console.info("park waypoint selected", park);
+    try {
+      const candidate = await request(-1, 0, park);
+      console.info("park route length", candidate.route.distance);
+      if (Math.abs(candidate.route.distance - target) / target < 0.25)
+        found.push({
+          ...candidate,
+          route: { ...candidate.route, score: candidate.route.score - 4 },
+        });
+    } catch (error) {
+      signal.throwIfAborted();
+      console.warn(
+        "park route error",
+        error instanceof ProviderError ? error.status : String(error),
+      );
+      if (error instanceof ProviderError && error.status === 429) throw error;
+    }
+  }
   for (const seed of seeds) {
     try {
       found.push(await request(seed, requestedLength));
@@ -183,11 +363,6 @@ export async function searchOrs(
       if (error instanceof ProviderError && found.length) break;
       throw error;
     }
-    if (
-      found.at(-1)!.route.score < -0.5 &&
-      Math.abs(found.at(-1)!.route.distance - target) / target < 0.08
-    )
-      break;
   }
   if (!found.length && lastTimeout) throw lastTimeout;
   if (!found.length)
@@ -197,7 +372,10 @@ export async function searchOrs(
     );
   found.sort((a, b) => a.route.score - b.route.score);
   const best = found[0];
-  if (Math.abs(best.route.distance - target) / target > 0.12) {
+  if (
+    best.seed !== -1 &&
+    Math.abs(best.route.distance - target) / target > 0.12
+  ) {
     const correction = Math.round(
       Math.min(
         target * 1.25,
