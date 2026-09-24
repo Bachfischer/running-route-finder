@@ -11,6 +11,7 @@ import { jsonFetch, type Fetcher } from "./providers.ts";
 
 const endpoint =
   "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson";
+const parksEndpoint = "https://api.heigit.org/openpoiservice/v0/pois";
 // Separate seeds sample substantially different round trips in dense cities.
 const seeds = [5, 17, 41, 101];
 type Extra = { values?: unknown };
@@ -21,6 +22,7 @@ type Feature = {
     extras?: Record<string, Extra>;
   };
 };
+type ParkFeature = { geometry?: { type?: unknown; coordinates?: unknown } };
 
 function bearing(start: Coord, point: Coord) {
   const x = (point[0] - start[0]) * Math.cos((start[1] * Math.PI) / 180);
@@ -126,6 +128,97 @@ export function parseRoute(
   return { route, green, quiet, paths };
 }
 
+/** Find a park far enough away to spend the run there, rather than circling a tiny square. */
+export async function findPark(
+  start: Coord,
+  target: number,
+  requested: number | undefined,
+  key: string,
+  signal: AbortSignal,
+  fetcher: Fetcher,
+): Promise<Coord | null> {
+  const radius = Math.min(4000, Math.max(1200, target * 0.4));
+  const data = await jsonFetch(
+    parksEndpoint,
+    {
+      method: "POST",
+      signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+      headers: {
+        Authorization: key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        request: "pois",
+        geometry: {
+          geojson: { type: "Point", coordinates: start },
+          buffer: radius,
+        },
+        filters: { category_ids: [280] },
+        limit: 50,
+        sortby: "distance",
+      }),
+    },
+    500_000,
+    fetcher,
+  );
+  const features = (data as { features?: ParkFeature[] } | null)?.features;
+  if (!Array.isArray(features)) return null;
+  return (
+    features
+      .map((feature) => feature.geometry)
+      .filter((geometry): geometry is { type: "Point"; coordinates: Coord } => {
+        const p = geometry?.coordinates;
+        return (
+          geometry?.type === "Point" &&
+          Array.isArray(p) &&
+          p.length === 2 &&
+          p.every((v) => typeof v === "number" && Number.isFinite(v)) &&
+          Math.abs(p[0]) <= 180 &&
+          Math.abs(p[1]) <= 85
+        );
+      })
+      .map((geometry) => geometry.coordinates)
+      .filter(
+        (p) =>
+          meters(start, p) >= target * 0.12 && meters(start, p) <= target * 0.4,
+      )
+      .sort((a, b) => {
+        const preference = (p: Coord) =>
+          Math.abs(meters(start, p) - target * 0.24) +
+          (requested === undefined
+            ? 0
+            : (Math.abs(((bearing(start, p) - requested + 540) % 360) - 180) /
+                180) *
+              target *
+              0.2);
+        return preference(a) - preference(b);
+      })[0] ?? null
+  );
+}
+
+function parkWaypoints(start: Coord, park: Coord, target: number): Coord[] {
+  const angle = Math.atan2(
+    (park[0] - start[0]) * Math.cos((start[1] * Math.PI) / 180),
+    park[1] - start[1],
+  );
+  const reach = Math.min(
+    1600,
+    Math.max(650, (target - 2 * meters(start, park)) / 2),
+  );
+  const width = Math.min(450, target * 0.04);
+  const offset = (north: number, east: number): Coord => [
+    park[0] + east / (111_200 * Math.cos((park[1] * Math.PI) / 180)),
+    park[1] + north / 111_200,
+  ];
+  return [
+    start,
+    offset(-Math.sin(angle) * width, Math.cos(angle) * width),
+    offset(Math.cos(angle) * reach, Math.sin(angle) * reach),
+    offset(Math.sin(angle) * width, -Math.cos(angle) * width),
+    start,
+  ];
+}
+
 /** Four alternatives and at most one length correction. */
 export async function searchOrs(
   input: RouteInput,
@@ -145,7 +238,7 @@ export async function searchOrs(
   const requestedLength = Math.round(target * 0.5);
   const found: (ReturnType<typeof parseRoute> & { seed: number })[] = [];
   let lastTimeout: ProviderTimeoutError | undefined;
-  const request = async (seed: number, length: number) => {
+  const request = async (seed: number, length: number, park?: Coord) => {
     signal.throwIfAborted();
     const data = await jsonFetch(
       endpoint,
@@ -158,11 +251,11 @@ export async function searchOrs(
           Accept: "application/geo+json",
         },
         body: JSON.stringify({
-          coordinates: [start],
+          coordinates: park ? parkWaypoints(start, park, target) : [start],
           instructions: false,
           extra_info: ["green", "noise", "waytype"],
           options: {
-            round_trip: { length, points: 3, seed },
+            ...(park ? {} : { round_trip: { length, points: 3, seed } }),
             avoid_features: ["steps", "ferries"],
             profile_params: {
               weightings: { green: 1, quiet: 1 },
@@ -175,6 +268,32 @@ export async function searchOrs(
     );
     return { ...parseRoute(data, start, target, requested), seed };
   };
+  // Park waypoints actively take the route inside mapped green space. ORS's
+  // green rating alone can label tree-lined city streets as highly green.
+  let park: Coord | null = null;
+  try {
+    park = await findPark(start, target, requested, key, signal, fetcher);
+  } catch (error) {
+    signal.throwIfAborted();
+    if (error instanceof ProviderError && error.status === 429)
+      throw new ProviderError(
+        "Routing service quota reached. Please try again later.",
+        429,
+      );
+  }
+  if (park) {
+    try {
+      const candidate = await request(-1, 0, park);
+      if (Math.abs(candidate.route.distance - target) / target < 0.3)
+        found.push({
+          ...candidate,
+          route: { ...candidate.route, score: candidate.route.score - 4 },
+        });
+    } catch (error) {
+      signal.throwIfAborted();
+      if (error instanceof ProviderError && error.status === 429) throw error;
+    }
+  }
   for (const seed of seeds) {
     try {
       found.push(await request(seed, requestedLength));
@@ -201,7 +320,10 @@ export async function searchOrs(
     );
   found.sort((a, b) => a.route.score - b.route.score);
   const best = found[0];
-  if (Math.abs(best.route.distance - target) / target > 0.12) {
+  if (
+    best.seed !== -1 &&
+    Math.abs(best.route.distance - target) / target > 0.12
+  ) {
     const correction = Math.round(
       Math.min(
         target * 1.25,
