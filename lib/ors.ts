@@ -132,14 +132,14 @@ export function parseRoute(
 }
 
 /** Find a park far enough away to spend the run there, rather than circling a tiny square. */
-export async function findPark(
+export async function findParks(
   start: Coord,
   target: number,
   requested: number | undefined,
   key: string,
   signal: AbortSignal,
   fetcher: Fetcher,
-): Promise<Coord | null> {
+): Promise<Coord[]> {
   const radius = Math.min(1900, Math.max(700, target * 0.2));
   const heading = ((requested ?? 0) * Math.PI) / 180;
   const lookAhead = requested === undefined ? 0 : Math.min(1700, target * 0.17);
@@ -201,38 +201,43 @@ export async function findPark(
         ])
       : null,
   );
-  if (!Array.isArray(features)) return null;
-  return (
-    features
-      .map((feature) => feature.geometry)
-      .filter((geometry): geometry is { type: "Point"; coordinates: Coord } => {
-        const p = geometry?.coordinates;
-        return (
-          geometry?.type === "Point" &&
-          Array.isArray(p) &&
-          p.length === 2 &&
-          p.every((v) => typeof v === "number" && Number.isFinite(v)) &&
-          Math.abs(p[0]) <= 180 &&
-          Math.abs(p[1]) <= 85
-        );
-      })
-      .map((geometry) => geometry.coordinates)
-      .filter(
-        (p) =>
-          meters(start, p) >= target * 0.12 && meters(start, p) <= target * 0.4,
-      )
-      .sort((a, b) => {
-        const preference = (p: Coord) =>
-          Math.abs(meters(start, p) - target * 0.24) +
-          (requested === undefined
-            ? 0
-            : (Math.abs(((bearing(start, p) - requested + 540) % 360) - 180) /
-                180) *
-              target *
-              0.2);
-        return preference(a) - preference(b);
-      })[0] ?? null
-  );
+  if (!Array.isArray(features)) return [];
+  const ranked = features
+    .map((feature) => feature.geometry)
+    .filter((geometry): geometry is { type: "Point"; coordinates: Coord } => {
+      const p = geometry?.coordinates;
+      return (
+        geometry?.type === "Point" &&
+        Array.isArray(p) &&
+        p.length === 2 &&
+        p.every((v) => typeof v === "number" && Number.isFinite(v)) &&
+        Math.abs(p[0]) <= 180 &&
+        Math.abs(p[1]) <= 85
+      );
+    })
+    .map((geometry) => geometry.coordinates)
+    .filter(
+      (p) =>
+        meters(start, p) >= target * 0.12 && meters(start, p) <= target * 0.4,
+    )
+    .sort((a, b) => {
+      const preference = (p: Coord) =>
+        Math.abs(meters(start, p) - target * 0.3) +
+        (requested === undefined
+          ? 0
+          : (Math.abs(((bearing(start, p) - requested + 540) % 360) - 180) /
+              180) *
+            target *
+            0.06);
+      return preference(a) - preference(b);
+    });
+  const distinct: Coord[] = [];
+  for (const park of ranked) {
+    if (distinct.every((other) => meters(park, other) > 650))
+      distinct.push(park);
+    if (distinct.length === 4) break;
+  }
+  return distinct;
 }
 
 function parkWaypoints(start: Coord, park: Coord, target: number): Coord[] {
@@ -244,16 +249,14 @@ function parkWaypoints(start: Coord, park: Coord, target: number): Coord[] {
     1600,
     Math.max(650, (target - 2 * meters(start, park)) / 2),
   );
-  const width = Math.min(450, target * 0.04);
   const offset = (north: number, east: number): Coord => [
     park[0] + east / (111_200 * Math.cos((park[1] * Math.PI) / 180)),
     park[1] + north / 111_200,
   ];
   return [
     start,
-    offset(-Math.sin(angle) * width, Math.cos(angle) * width),
+    park,
     offset(Math.cos(angle) * reach, Math.sin(angle) * reach),
-    offset(Math.sin(angle) * width, -Math.cos(angle) * width),
     start,
   ];
 }
@@ -309,9 +312,9 @@ export async function searchOrs(
   };
   // Park waypoints actively take the route inside mapped green space. ORS's
   // green rating alone can label tree-lined city streets as highly green.
-  let park: Coord | null = null;
+  let parks: Coord[] = [];
   try {
-    park = await findPark(start, target, requested, key, signal, fetcher);
+    parks = await findParks(start, target, requested, key, signal, fetcher);
   } catch (error) {
     signal.throwIfAborted();
     console.warn(
@@ -324,16 +327,21 @@ export async function searchOrs(
         429,
       );
   }
-  if (park) {
+  for (const park of parks) {
     console.info("park waypoint selected", park);
     try {
       const candidate = await request(-1, 0, park);
       console.info("park route length", candidate.route.distance);
-      if (Math.abs(candidate.route.distance - target) / target < 0.3)
+      if (Math.abs(candidate.route.distance - target) / target < 0.25)
         found.push({
           ...candidate,
           route: { ...candidate.route, score: candidate.route.score - 4 },
         });
+      if (
+        found.length &&
+        Math.abs(candidate.route.distance - target) / target < 0.15
+      )
+        break;
     } catch (error) {
       signal.throwIfAborted();
       console.warn(
