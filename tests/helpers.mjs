@@ -1,36 +1,3 @@
-export function grid({
-  size = 18,
-  spacing = 0.002,
-  center = [11.58, 48.14],
-} = {}) {
-  const elements = [],
-    width = size * 2 + 1;
-  for (let y = -size; y <= size; y++)
-    for (let x = -size; x <= size; x++) {
-      const id = (y + size) * width + x + size + 1;
-      elements.push({
-        type: "node",
-        id,
-        lon: center[0] + x * spacing,
-        lat: center[1] + y * spacing * 0.7,
-      });
-      if (x < size)
-        elements.push({
-          type: "way",
-          id: 100000 + id,
-          nodes: [id, id + 1],
-          tags: { highway: "footway" },
-        });
-      if (y < size)
-        elements.push({
-          type: "way",
-          id: 200000 + id,
-          nodes: [id, id + width],
-          tags: { highway: "residential" },
-        });
-    }
-  return elements;
-}
 export function routeRequest(
   body = { lat: 48.14, lon: 11.58, distance: 10, direction: "Any" },
   ip = "test",
@@ -45,19 +12,17 @@ export const result = {
   routes: [
     {
       coordinates: [
-        [11, 48],
-        [11.001, 48],
-        [11, 48],
+        [11.577, 48.142],
+        [11.58, 48.18],
+        [11.577, 48.142],
       ],
-      distance: 10000,
-      repeat: 0,
-      paths: 1,
-      score: 0,
+      distance: 10100,
       bearing: 0,
+      score: -0.4,
     },
   ],
+  quality: [{ green: 0.76, quiet: 0.84 }],
   snapDistance: 0,
-  candidates: 18,
 };
 export function streamResponse(chunks, headers = {}) {
   const encoder = new TextEncoder();

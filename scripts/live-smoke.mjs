@@ -20,7 +20,6 @@ assert.ok(Math.abs(result.routes[0].distance - 10000) < 1500);
 console.log(
   JSON.stringify({
     km: result.routes[0].distance / 1000,
-    source: result.source,
     green: result.quality?.[0]?.green,
   }),
 );

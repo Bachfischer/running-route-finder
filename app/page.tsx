@@ -14,15 +14,15 @@ import {
   ArrowRight,
   Flag,
   Compass,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toGpx } from "@/lib/gpx";
-import { SiteFooter } from "@/components/site-header";
-import type { LoopResult } from "@/lib/routing";
+import { SiteFooter } from "@/components/site-footer";
+import type { LoopResult } from "@/lib/route";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
-const directions = ["Any", "N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const compassPoints = [
   { value: "NW", label: "Northwest" },
   { value: "N", label: "North" },
@@ -320,16 +320,7 @@ export default function Home() {
                 Math.abs(c[0]) <= 180 &&
                 Math.abs(c[1]) <= 85,
             ) ||
-            ![
-              r.parks,
-              r.paths,
-              r.repeat,
-              r.steps,
-              r.trafficLights,
-              r.crossings,
-              r.barriers,
-              r.railwayCrossings,
-            ].every(Number.isFinite),
+            !Number.isFinite(r.bearing),
         )
       )
         throw Error(
@@ -372,7 +363,7 @@ export default function Home() {
             <h1>Running route finder</h1>
             <p>
               A better way out the door. Find a loop from wherever you are, with
-              more green space and fewer interruptions along the way.
+              greener and quieter paths along the way.
             </p>
           </div>
         </>
@@ -534,7 +525,7 @@ export default function Home() {
               <p id="distance-help" className="field-hint">
                 {Number(distance) < 2 || Number(distance) > 25
                   ? "Enter a distance between 2 and 25 km."
-                  : "Parks and fewer interruptions, always preferred."}
+                  : "Green and quiet paths preferred where available."}
               </p>
               <div className="presets">
                 {[3, 5, 10, 21.1].map((k) => (
@@ -644,8 +635,7 @@ export default function Home() {
               )}
               {busy && (
                 <p className="status">
-                  Looking for park paths with fewer stops. This can take up to
-                  two minutes.
+                  Finding walking loops with green and quiet preferences.
                 </p>
               )}
               {error && (
@@ -654,6 +644,14 @@ export default function Home() {
                 </p>
               )}
             </div>
+            <a
+              className="source-link"
+              href="https://github.com/Bachfischer/running-route-finder"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink size={16} /> View source on GitHub
+            </a>
           </div>
           <div className="sidebar-footer">
             <Route size={17} />
@@ -725,7 +723,7 @@ export default function Home() {
                 <LoaderCircle className="spin" />
                 <div>
                   <h2>Finding a smoother run.</h2>
-                  <p>Comparing parks, crossings and repeated paths.</p>
+                  <p>Comparing distance, direction and green/quiet ratings.</p>
                 </div>
               </div>
             )}
@@ -758,31 +756,17 @@ export default function Home() {
                 </div>
               </div>
               <div className="route-facts">
-                {result.source === "openrouteservice" ? (
-                  <>
-                    <span>
-                      {result.quality?.[selected]?.green == null
-                        ? "Green rating unavailable"
-                        : `${Math.round(result.quality[selected].green! * 100)}% of route rated green`}
-                    </span>
-                    <span>
-                      {result.quality?.[selected]?.quiet == null
-                        ? "Quiet rating unavailable"
-                        : `${Math.round(result.quality[selected].quiet! * 100)}% of route rated quiet`}
-                    </span>
-                    <span>Stairs avoided where mapped</span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      {Math.round(chosen.parks * 100)}% in mapped green spaces
-                    </span>
-                    <span>
-                      {chosen.trafficLights} mapped traffic-light encounters
-                    </span>
-                    <span>{chosen.crossings} mapped crossing sections</span>
-                  </>
-                )}
+                <span>
+                  {result.quality?.[selected]?.green == null
+                    ? "Green rating unavailable"
+                    : `${Math.round(result.quality[selected].green! * 100)}% of route rated green`}
+                </span>
+                <span>
+                  {result.quality?.[selected]?.quiet == null
+                    ? "Quiet rating unavailable"
+                    : `${Math.round(result.quality[selected].quiet! * 100)}% of route rated quiet`}
+                </span>
+                <span>Stairs avoided where mapped</span>
               </div>
               {result.routes.length > 1 && (
                 <details className="alternative-options">
@@ -813,51 +797,13 @@ export default function Home() {
               </Button>
               <details className="recommendation-details">
                 <summary>Why this loop?</summary>
-                {result.source === "openrouteservice" ? (
-                  <p>
-                    Four seeded walking loops are requested with green and quiet
-                    preferences and mapped stairs avoided. One extra request may
-                    adjust the length. We rank the returned routes by target
-                    distance, direction and green/quiet ratings. Ratings
-                    describe route segments, not park boundaries. Traffic lights
-                    and crossings are not counted by this provider; a stop-free
-                    run cannot be guaranteed. Check the map and local signs.
-                  </p>
-                ) : (
-                  <>
-                    <p>
-                      We favor mapped parks and fewer interruptions: traffic
-                      lights, road and railway crossings, gates, stairs, and
-                      sharp turns. Distance, repeated paths and direction also
-                      affect the choice. This is the best candidate found, not a
-                      guaranteed stop-free route.
-                    </p>
-                    <div className="route-facts detail-facts">
-                      <span>
-                        {(chosen.repeat * 100).toFixed(1)}% repeated distance
-                      </span>
-                      <span>
-                        {Math.round(chosen.paths * 100)}% paths & tracks
-                      </span>
-                      <span>
-                        Loop heads{" "}
-                        {directions[1 + (Math.round(chosen.bearing / 45) % 8)]}
-                      </span>
-                      <span>{chosen.barriers} mapped barriers</span>
-                      <span>
-                        {chosen.railwayCrossings} mapped railway crossings
-                      </span>
-                      <span>{Math.round(chosen.steps)} m of stairs</span>
-                      <span>{chosen.sharpTurns} sharp junction turns</span>
-                    </div>
-                    <p>
-                      Green-space coverage comes from mapped boundaries;
-                      unmapped obstacles cannot be counted. Adjacent crossing
-                      markings are grouped into sections; these are not
-                      predicted stops or waiting times.
-                    </p>
-                  </>
-                )}
+                <p>
+                  We request four walking loops with green and quiet preferences
+                  and avoid mapped stairs. One extra request may adjust the
+                  length. We rank routes by target distance, direction and
+                  provider ratings. Traffic lights and crossings are not
+                  counted; check the map and local signs before running.
+                </p>
               </details>
               <p className="route-note">
                 {result.snapDistance > 30

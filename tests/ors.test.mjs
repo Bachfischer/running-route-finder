@@ -72,7 +72,6 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
   });
   assert.deepEqual(calls[0].body.options.avoid_features, ["steps", "ferries"]);
   assert.deepEqual(calls[0].body.extra_info, ["green", "noise"]);
-  assert.equal(result.source, "openrouteservice");
   assert.equal(result.routes[0].distance, 10100);
   assert.deepEqual(
     result.routes[0].coordinates[0],
@@ -229,7 +228,6 @@ test("same-origin API returns a 10 km Munich GPX-ready loop via managed provider
   );
   assert.equal(response.status, 200);
   const result = await response.json();
-  assert.equal(result.source, "openrouteservice");
   assert.ok(Math.abs(result.routes[0].distance - 10000) < 1500);
   assert.deepEqual(
     result.routes[0].coordinates[0],

@@ -1,4 +1,4 @@
-import type { Coord } from "./routing.ts";
+import type { Coord } from "./route.ts";
 export function toGpx(coordinates: Coord[]): string {
   if (
     coordinates.length < 2 ||

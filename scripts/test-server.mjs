@@ -1,4 +1,4 @@
-// Real compiled Next.js + Node.js server; only external provider data is recorded.
+// Real compiled Next.js server with a deterministic ORS response.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
@@ -24,7 +24,7 @@ const child = spawn(
       ...process.env,
       NODE_ENV: "production",
       VERCEL: "",
-      OVERPASS_URL: "",
+      ORS_API_KEY: "test-only-key",
       PHOTON_URL: "",
       ROUTE_TEST_FIXTURES: "1",
     },
@@ -88,25 +88,15 @@ try {
     assert.equal(response.headers.get("cache-control"), "no-store");
     const route = result.routes[0];
     assert.ok(Math.abs(route.distance - 10000) < 500);
-    assert.ok(route.parks > 0.88 && route.paths > 0.98 && route.repeat < 0.05);
-    for (const key of [
-      "trafficLights",
-      "crossings",
-      "barriers",
-      "railwayCrossings",
-      "steps",
-    ])
-      assert.equal(route[key], 0);
+    assert.equal(result.quality[0].green, 1);
+    assert.equal(result.quality[0].quiet, 1);
     assert.deepEqual(route.coordinates[0], route.coordinates.at(-1));
     console.log(
-      `Production Node.js API: ${(route.distance / 1000).toFixed(3)} km, ${(route.parks * 100).toFixed(1)}% green, zero mapped interruptions.`,
+      `Production Node.js API: ${(route.distance / 1000).toFixed(2)} km.`,
     );
   }
-  await setTimeout(50); // Flush child stdout before asserting provider call count.
-  assert.equal(output.split("TEST_PROVIDER_OVERPASS").length - 1, 1, output);
-  console.log(
-    "Validation, coordinate lookup, real-map routing and repeated-search cache passed.",
-  );
+  assert.ok(output.includes("TEST_PROVIDER_ORS"), output);
+  console.log("Validation, coordinate lookup and ORS-backed route passed.");
 } catch (error) {
   console.error(output);
   throw error;

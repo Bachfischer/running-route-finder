@@ -1,12 +1,12 @@
-import { ProviderError, ProviderTimeoutError, RouteError } from "./errors.ts";
+import { ProviderError, ProviderTimeoutError } from "./errors.ts";
 import {
   compass,
   meters,
   type Coord,
   type Loop,
   type LoopResult,
-} from "./routing.ts";
-import type { RouteInput } from "./route-search.ts";
+  type RouteInput,
+} from "./route.ts";
 import { jsonFetch, type Fetcher } from "./providers.ts";
 
 const endpoint =
@@ -108,16 +108,6 @@ export function parseRoute(
     coordinates,
     distance: distance as number,
     bearing: heading,
-    // Detailed crossing and repeated-edge statistics require the original OSM graph.
-    repeat: 0,
-    paths: 0,
-    parks: 0,
-    trafficLights: 0,
-    crossings: 0,
-    barriers: 0,
-    railwayCrossings: 0,
-    steps: 0,
-    sharpTurns: 0,
     score:
       (Math.abs((distance as number) - target) / target) * 3 +
       (angle / 180) * 2 -
@@ -127,7 +117,7 @@ export function parseRoute(
   return { route, green, quiet };
 }
 
-/** Four alternatives and at most one length correction; no Overpass download. */
+/** Four alternatives and at most one length correction. */
 export async function searchOrs(
   input: RouteInput,
   key: string,
@@ -201,9 +191,9 @@ export async function searchOrs(
   }
   if (!found.length && lastTimeout) throw lastTimeout;
   if (!found.length)
-    throw new RouteError(
-      "NO_LOOP",
+    throw new ProviderError(
       "No walking loop found here. Try a nearby start.",
+      422,
     );
   found.sort((a, b) => a.route.score - b.route.score);
   const best = found[0];
@@ -229,8 +219,6 @@ export async function searchOrs(
   return {
     routes: found.map((r) => r.route),
     quality: found.map((r) => ({ green: r.green, quiet: r.quiet })),
-    source: "openrouteservice",
     snapDistance: meters(start, found[0].route.coordinates[0]),
-    candidates: found.length,
   };
 }
