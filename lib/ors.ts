@@ -138,6 +138,8 @@ export async function findPark(
   fetcher: Fetcher,
 ): Promise<Coord | null> {
   const radius = Math.min(4000, Math.max(1200, target * 0.4));
+  const latitude = radius / 111_200;
+  const longitude = latitude / Math.cos((start[1] * Math.PI) / 180);
   const data = await jsonFetch(
     parksEndpoint,
     {
@@ -150,8 +152,10 @@ export async function findPark(
       body: JSON.stringify({
         request: "pois",
         geometry: {
-          geojson: { type: "Point", coordinates: start },
-          buffer: radius,
+          bbox: [
+            [start[0] + longitude, start[1] + latitude],
+            [start[0] - longitude, start[1] - latitude],
+          ],
         },
         filters: { category_ids: [280] },
         limit: 50,
@@ -159,7 +163,11 @@ export async function findPark(
       }),
     },
     500_000,
-    fetcher,
+    async (url, init) => {
+      const response = await fetcher(url, init);
+      console.info("park lookup HTTP", response.status);
+      return response;
+    },
   );
   const features = (data as { features?: ParkFeature[] } | null)?.features;
   console.info(
