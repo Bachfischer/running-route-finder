@@ -129,6 +129,8 @@ test("Odeonsplatz generates a route through a nearby mapped park", async () => {
     },
   );
   assert.equal(calls[0].body.filters.category_ids[0], 280);
+  assert.ok(calls[0].body.geometry.buffer <= 1900);
+  assert.ok(calls[0].body.geometry.geojson.coordinates[1] > origin[1]);
   assert.equal(calls[1].body.options.round_trip, undefined);
   assert.equal(calls[1].body.coordinates.length, 5);
   assert.deepEqual(calls[1].body.coordinates[0], origin);

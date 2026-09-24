@@ -137,9 +137,15 @@ export async function findPark(
   signal: AbortSignal,
   fetcher: Fetcher,
 ): Promise<Coord | null> {
-  const radius = Math.min(4000, Math.max(1200, target * 0.4));
-  const latitude = radius / 111_200;
-  const longitude = latitude / Math.cos((start[1] * Math.PI) / 180);
+  const radius = Math.min(1900, Math.max(700, target * 0.2));
+  const heading = ((requested ?? 0) * Math.PI) / 180;
+  const lookAhead = requested === undefined ? 0 : Math.min(1700, target * 0.17);
+  const center: Coord = [
+    start[0] +
+      (Math.sin(heading) * lookAhead) /
+        (111_200 * Math.cos((start[1] * Math.PI) / 180)),
+    start[1] + (Math.cos(heading) * lookAhead) / 111_200,
+  ];
   const data = await jsonFetch(
     parksEndpoint,
     {
@@ -152,10 +158,8 @@ export async function findPark(
       body: JSON.stringify({
         request: "pois",
         geometry: {
-          bbox: [
-            [start[0] + longitude, start[1] + latitude],
-            [start[0] - longitude, start[1] - latitude],
-          ],
+          geojson: { type: "Point", coordinates: center },
+          buffer: radius,
         },
         filters: { category_ids: [280] },
         limit: 50,
