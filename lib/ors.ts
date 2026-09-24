@@ -104,17 +104,26 @@ export function parseRoute(
   const extras = feature?.properties?.extras;
   const green = quality(extras?.green, coordinates, (v) => v >= 7);
   const quiet = quality(extras?.noise, coordinates, (v) => v <= 3);
+  // ORS calls this response field `waytypes` even though the request is `waytype`.
+  const paths = quality(extras?.waytypes ?? extras?.waytype, coordinates, (v) =>
+    [4, 5, 7].includes(v),
+  );
+  const relativeError = Math.abs((distance as number) - target) / target;
   const route: Loop = {
     coordinates,
     distance: distance as number,
     bearing: heading,
+    // Prefer green routes with actual running paths. Allow modest length and
+    // direction deviations rather than ranking a street loop first.
     score:
-      (Math.abs((distance as number) - target) / target) * 3 +
-      (angle / 180) * 2 -
-      (green ?? 0) * 0.8 -
-      (quiet ?? 0) * 0.3,
+      relativeError * 0.5 +
+      Math.max(0, relativeError - 0.15) * 8 +
+      (angle / 180) * 0.25 -
+      (green ?? 0) * 3 -
+      (paths ?? 0) * 1.5 -
+      (quiet ?? 0) * 0.7,
   };
-  return { route, green, quiet };
+  return { route, green, quiet, paths };
 }
 
 /** Four alternatives and at most one length correction. */
@@ -151,7 +160,7 @@ export async function searchOrs(
         body: JSON.stringify({
           coordinates: [start],
           instructions: false,
-          extra_info: ["green", "noise"],
+          extra_info: ["green", "noise", "waytype"],
           options: {
             round_trip: { length, points: 3, seed },
             avoid_features: ["steps", "ferries"],
@@ -183,11 +192,6 @@ export async function searchOrs(
       if (error instanceof ProviderError && found.length) break;
       throw error;
     }
-    if (
-      found.at(-1)!.route.score < -0.5 &&
-      Math.abs(found.at(-1)!.route.distance - target) / target < 0.08
-    )
-      break;
   }
   if (!found.length && lastTimeout) throw lastTimeout;
   if (!found.length)

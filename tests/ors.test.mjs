@@ -56,7 +56,7 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     new AbortController().signal,
     fetcher,
   );
-  assert.ok(calls.length >= 1 && calls.length <= 5);
+  assert.equal(calls.length, 4);
   assert.ok(
     calls[0].url.startsWith("https://api.heigit.org/openrouteservice/"),
   );
@@ -71,7 +71,7 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     quiet: 1,
   });
   assert.deepEqual(calls[0].body.options.avoid_features, ["steps", "ferries"]);
-  assert.deepEqual(calls[0].body.extra_info, ["green", "noise"]);
+  assert.deepEqual(calls[0].body.extra_info, ["green", "noise", "waytype"]);
   assert.equal(result.routes[0].distance, 10100);
   assert.deepEqual(
     result.routes[0].coordinates[0],
@@ -84,6 +84,41 @@ test("direction ranks a northern loop ahead of an equally distant southern loop"
   const north = parseRoute(sample(true), origin, 10000, 0);
   const south = parseRoute(sample(false), origin, 10000, 0);
   assert.ok(north.route.score < south.route.score);
+});
+test("Odeonsplatz favors park paths over a shorter street loop", async () => {
+  const street = sample(false, 10000);
+  street.features[0].properties.extras.green.values = [[0, 3, 2]];
+  street.features[0].properties.extras.noise.values = [[0, 3, 8]];
+  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
+  const park = sample(true, 11200);
+  park.features[0].properties.extras.green.values = [[0, 3, 9]];
+  park.features[0].properties.extras.noise.values = [[0, 3, 1]];
+  park.features[0].properties.extras.waytypes = { values: [[0, 3, 4]] };
+  let calls = 0;
+  const result = await searchOrs(
+    { ...input, direction: "S" },
+    "test-key",
+    new AbortController().signal,
+    async () => Response.json(++calls === 2 ? park : street),
+  );
+  assert.equal(calls, 4);
+  assert.equal(result.routes[0].distance, 11200);
+  assert.equal(result.quality[0].green, 1);
+  assert.equal(result.quality[0].quiet, 1);
+});
+test("park paths remain useful when green and noise data are unavailable", () => {
+  const street = sample(true);
+  const path = sample(true, 10900);
+  delete street.features[0].properties.extras.green;
+  delete street.features[0].properties.extras.noise;
+  delete path.features[0].properties.extras.green;
+  delete path.features[0].properties.extras.noise;
+  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
+  path.features[0].properties.extras.waytypes = { values: [[0, 3, 7]] };
+  assert.ok(
+    parseRoute(path, origin, 10000, undefined).route.score <
+      parseRoute(street, origin, 10000, undefined).route.score,
+  );
 });
 test("widely spaced seeds and one bounded correction improve an overshot loop", async () => {
   const calls = [];
