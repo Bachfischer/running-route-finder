@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHandlers, validRouteInput, failure } from "../lib/http.ts";
-import { ProviderError, RouteError, MapCapacityError } from "../lib/errors.ts";
+import { ProviderError, MapCapacityError } from "../lib/errors.ts";
 import { result, routeRequest } from "./helpers.mjs";
 const valid = { lat: 48.14, lon: 11.58, distance: 10, direction: "N" };
 const invalid = [
@@ -100,12 +100,12 @@ test("multiple devices can calculate independently while another route is runnin
   assert.equal((await first).status, 503);
   const third = h.loops(routeRequest(valid, "device-one"));
   await new Promise((r) => setImmediate(r));
-  finish[3].reject(new RouteError("NO_LOOP", "No route"));
+  finish[3].reject(new ProviderError("No route", 422));
   assert.equal((await third).status, 422);
 });
 for (const [e, status] of [
   [new ProviderError("busy", 429), 429],
-  [new RouteError("NO_LOOP", "No route"), 422],
+  [new ProviderError("No route", 422), 422],
   [new MapCapacityError(), 503],
   [new Error("private secret"), 500],
 ])

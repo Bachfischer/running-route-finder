@@ -4,14 +4,6 @@ export class MapCapacityError extends Error {
     this.name = "MapCapacityError";
   }
 }
-export class RouteError extends Error {
-  code: "NO_START" | "NO_LOOP";
-  constructor(code: "NO_START" | "NO_LOOP", message: string) {
-    super(message);
-    this.name = "RouteError";
-    this.code = code;
-  }
-}
 export class ProviderError extends Error {
   status: number;
   constructor(message: string, status = 503) {

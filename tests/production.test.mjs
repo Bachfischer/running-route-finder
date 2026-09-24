@@ -2,9 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHandlers, failure } from "../lib/http.ts";
 import { readTextBounded, jsonFetch } from "../lib/providers.ts";
-import { searchLoops } from "../lib/route-search.ts";
-import { routeRequest, result, grid } from "./helpers.mjs";
-import { findLoops } from "../lib/routing.ts";
+import { routeRequest, result } from "./helpers.mjs";
 
 test("cross-origin requests cannot consume routing work", async () => {
   const handlers = createHandlers({
@@ -68,35 +66,6 @@ test("request cancellation reaches search dependencies", async () => {
   });
   assert.equal((await handler.loops(req)).status, 499);
 });
-test("cancelled route search makes no provider request", async () => {
-  await assert.rejects(
-    searchLoops(
-      { lat: 48, lon: 11, distance: 10, direction: "N" },
-      async () => {
-        throw Error("must not load");
-      },
-      Date.now,
-      AbortSignal.abort(),
-    ),
-    { name: "AbortError" },
-  );
-});
-test("cancellation while loading prevents graph construction", async () => {
-  const c = new AbortController();
-  await assert.rejects(
-    searchLoops(
-      { lat: 48, lon: 11, distance: 10, direction: "N" },
-      async (_, signal) => {
-        c.abort();
-        assert.ok(signal.aborted);
-        return [];
-      },
-      Date.now,
-      c.signal,
-    ),
-    { name: "AbortError" },
-  );
-});
 test("timeout responses are safe and not cacheable", () => {
   const response = failure(
     new DOMException("internal timeout", "TimeoutError"),
@@ -110,30 +79,4 @@ test("providers prohibit redirects and bypass implicit framework caching", async
     assert.equal(init.cache, "no-store");
     return Response.json({});
   });
-});
-
-test("expired CPU budget prevents graph work", () => {
-  assert.throws(
-    () => findLoops([], [11.58, 48.14], 10000, "N", 0),
-    /timed out/,
-  );
-});
-test("CPU budget is checked after graph construction", (t) => {
-  let reads = 0;
-  t.mock.method(Date, "now", () => (++reads === 1 ? 0 : 100));
-  assert.throws(
-    () => findLoops(grid(), [11.58, 48.14], 10000, "N", 50),
-    /timed out/,
-  );
-});
-test("CPU budget preserves a complete loop already discovered", (t) => {
-  let reads = 0;
-  t.mock.method(Date, "now", () => (++reads < 50 ? 0 : 100));
-  const found = findLoops(grid(), [11.58, 48.14], 5000, "Any", 50);
-  assert.ok(found.routes.length > 0);
-  assert.ok(found.candidates < 96);
-  assert.deepEqual(
-    found.routes[0].coordinates[0],
-    found.routes[0].coordinates.at(-1),
-  );
 });

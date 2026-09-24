@@ -1,11 +1,34 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-const result = JSON.parse(
-  readFileSync(
-    new URL("../fixtures/munich-result.json", import.meta.url),
-    "utf8",
-  ),
-);
+const result = {
+  routes: [
+    {
+      coordinates: [
+        [11.577, 48.142],
+        [11.58, 48.18],
+        [11.577, 48.142],
+      ],
+      distance: 10100,
+      bearing: 0,
+      score: -0.4,
+    },
+    {
+      coordinates: [
+        [11.577, 48.142],
+        [11.55, 48.15],
+        [11.577, 48.142],
+      ],
+      distance: 10500,
+      bearing: 270,
+      score: 0,
+    },
+  ],
+  quality: [
+    { green: 0.76, quiet: 0.84 },
+    { green: null, quiet: null },
+  ],
+  snapDistance: 0,
+};
 async function choose(page: Page) {
   await page
     .getByRole("button", { name: "Try 10 km from Odeonsplatz" })
@@ -97,37 +120,10 @@ test("coordinate lookup works through the real Node.js API using keyboard", asyn
     page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeEnabled();
 });
-test("10 km result, green coverage, signals and explanation are displayed", async ({
+test("route ratings are displayed without invented interruption counts", async ({
   page,
 }) => {
   await mockRoutes(page);
-  await choose(page);
-  await find(page);
-  await expect(
-    page.getByText(
-      `${Math.round(result.routes[0].parks * 100)}% in mapped green spaces`,
-    ),
-  ).toBeVisible();
-  await expect(
-    page.getByText(
-      `${result.routes[0].trafficLights} mapped traffic-light encounters`,
-    ),
-  ).toBeVisible();
-  await page.getByText("Why this loop?", { exact: true }).click();
-  await expect(page.getByText(/We favor mapped parks/)).toBeVisible();
-});
-test("managed-provider result describes ratings without invented traffic-light counts", async ({
-  page,
-}) => {
-  await page.route("**/api/loops", (route) =>
-    route.fulfill({
-      json: {
-        ...result,
-        source: "openrouteservice",
-        quality: result.routes.map(() => ({ green: 0.76, quiet: 0.84 })),
-      },
-    }),
-  );
   await choose(page);
   await find(page);
   await expect(page.getByText("76% of route rated green")).toBeVisible();
@@ -343,52 +339,6 @@ test("embedded planner hides surrounding website navigation", async ({
     page.getByRole("heading", { name: "Plan your run" }),
   ).toBeVisible();
 });
-for (const name of ["Running route finder", "Launch route finder"]) {
-  test(`Projects integration launches the planner: ${name}`, async ({
-    page,
-  }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    await page.goto("/projects/");
-    await expect(
-      page.getByRole("heading", { name: "Projects", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("link", { name, exact: true }).click();
-    await expect(
-      page.getByRole("heading", { name: "Plan your run" }),
-    ).toBeVisible();
-    expect(errors).toEqual([]);
-  });
-}
-
-for (const name of ["Running route finder", "Launch route finder"]) {
-  test(`Projects launch works without JavaScript: ${name}`, async ({
-    browser,
-    baseURL,
-    viewport,
-    isMobile,
-    hasTouch,
-  }) => {
-    const context = await browser.newContext({
-      javaScriptEnabled: false,
-      baseURL,
-      viewport,
-      isMobile,
-      hasTouch,
-    });
-    const page = await context.newPage();
-    try {
-      await page.goto("/projects/");
-      await page.getByRole("link", { name, exact: true }).click();
-      await expect(
-        page.getByRole("heading", { name: "Plan your run" }),
-      ).toBeVisible();
-    } finally {
-      await context.close();
-    }
-  });
-}
-
 test("default direction is best available and compass choices are visible", async ({
   page,
 }) => {

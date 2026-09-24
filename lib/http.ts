@@ -4,9 +4,8 @@ import {
   readTextBounded,
   type Fetcher,
 } from "./providers.ts";
-import { searchLoops, type RouteInput } from "./route-search.ts";
-import { ProviderError, RouteError, MapCapacityError } from "./errors.ts";
-import type { LoopResult } from "./routing.ts";
+import { ProviderError, MapCapacityError } from "./errors.ts";
+import type { LoopResult, RouteInput } from "./route.ts";
 const directions = ["Any", "N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export function validRouteInput(value: unknown): value is RouteInput {
   if (!value || typeof value !== "object") return false;
@@ -40,7 +39,6 @@ export function failure(e: unknown) {
     return apiError("The request was cancelled.", 499);
   if (e instanceof Error && e.name === "TimeoutError")
     return apiError("The request timed out. Please try again.", 504);
-  if (e instanceof RouteError) return apiError(e.message, 422);
   if (e instanceof ProviderError)
     return apiError(e.message, e.status, e.status === 429 ? 60 : undefined);
   if (e instanceof MapCapacityError)
@@ -55,10 +53,7 @@ type Dependencies = {
   search?: (input: RouteInput, signal: AbortSignal) => Promise<LoopResult>;
 };
 export function createHandlers(deps: Dependencies = {}) {
-  const fetcher = deps.fetcher || fetch,
-    search =
-      deps.search ||
-      ((input, signal) => searchLoops(input, undefined, undefined, signal));
+  const fetcher = deps.fetcher || fetch;
   return {
     async loops(req: Request) {
       const origin = req.headers.get("origin");
@@ -94,7 +89,8 @@ export function createHandlers(deps: Dependencies = {}) {
         );
       try {
         req.signal.throwIfAborted();
-        return Response.json(await search(body, req.signal), {
+        if (!deps.search) throw new Error("Route search is not configured.");
+        return Response.json(await deps.search(body, req.signal), {
           headers: { "Cache-Control": "no-store" },
         });
       } catch (e) {
