@@ -183,6 +183,12 @@ export async function findPark(
     "park lookup result",
     Array.isArray(features) ? features.length : "invalid",
   );
+  console.info(
+    "park lookup sample",
+    Array.isArray(features)
+      ? features.slice(0, 5).map((f) => f.geometry)
+      : null,
+  );
   if (!Array.isArray(features)) return null;
   return (
     features
@@ -307,6 +313,7 @@ export async function searchOrs(
       );
   }
   if (park) {
+    console.info("park waypoint selected", park);
     try {
       const candidate = await request(-1, 0, park);
       if (Math.abs(candidate.route.distance - target) / target < 0.3)
