@@ -162,6 +162,7 @@ export async function findPark(
     fetcher,
   );
   const features = (data as { features?: ParkFeature[] } | null)?.features;
+  console.info("park lookup result", Array.isArray(features) ? features.length : "invalid");
   if (!Array.isArray(features)) return null;
   return (
     features
@@ -275,6 +276,7 @@ export async function searchOrs(
     park = await findPark(start, target, requested, key, signal, fetcher);
   } catch (error) {
     signal.throwIfAborted();
+    console.warn("park lookup error", error instanceof ProviderError ? error.status : String(error));
     if (error instanceof ProviderError && error.status === 429)
       throw new ProviderError(
         "Routing service quota reached. Please try again later.",
@@ -291,6 +293,7 @@ export async function searchOrs(
         });
     } catch (error) {
       signal.throwIfAborted();
+      console.warn("park route error", error instanceof ProviderError ? error.status : String(error));
       if (error instanceof ProviderError && error.status === 429) throw error;
     }
   }
