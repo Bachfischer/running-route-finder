@@ -299,9 +299,9 @@ export async function searchOrs(
           options: {
             ...(park ? {} : { round_trip: { length, points: 3, seed } }),
             avoid_features: ["steps", "ferries"],
-            profile_params: {
-              weightings: { green: 1, quiet: 1 },
-            },
+            ...(park
+              ? {}
+              : { profile_params: { weightings: { green: 1, quiet: 1 } } }),
           },
         }),
       },
@@ -337,11 +337,6 @@ export async function searchOrs(
           ...candidate,
           route: { ...candidate.route, score: candidate.route.score - 4 },
         });
-      if (
-        found.length &&
-        Math.abs(candidate.route.distance - target) / target < 0.15
-      )
-        break;
     } catch (error) {
       signal.throwIfAborted();
       console.warn(
