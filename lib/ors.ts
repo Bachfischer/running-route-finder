@@ -22,7 +22,10 @@ type Feature = {
     extras?: Record<string, Extra>;
   };
 };
-type ParkFeature = { geometry?: { type?: unknown; coordinates?: unknown } };
+type ParkFeature = {
+  geometry?: { type?: unknown; coordinates?: unknown };
+  properties?: { osm_tags?: { name?: string } };
+};
 
 function bearing(start: Coord, point: Coord) {
   const x = (point[0] - start[0]) * Math.cos((start[1] * Math.PI) / 180);
@@ -189,6 +192,15 @@ export async function findPark(
       ? features.slice(0, 5).map((f) => f.geometry)
       : null,
   );
+  console.info(
+    "park lookup names",
+    Array.isArray(features)
+      ? features.map((f) => [
+          f.properties?.osm_tags?.name,
+          f.geometry?.coordinates,
+        ])
+      : null,
+  );
   if (!Array.isArray(features)) return null;
   return (
     features
@@ -316,6 +328,7 @@ export async function searchOrs(
     console.info("park waypoint selected", park);
     try {
       const candidate = await request(-1, 0, park);
+      console.info("park route length", candidate.route.distance);
       if (Math.abs(candidate.route.distance - target) / target < 0.3)
         found.push({
           ...candidate,
