@@ -166,6 +166,11 @@ export async function findPark(
     async (url, init) => {
       const response = await fetcher(url, init);
       console.info("park lookup HTTP", response.status);
+      if (!response.ok)
+        console.warn(
+          "park lookup response",
+          (await response.clone().text()).slice(0, 500),
+        );
       return response;
     },
   );
