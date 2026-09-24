@@ -1,0 +1,2 @@
+# Vercel may rewrite its build configuration before running the build command.
+vercel.json

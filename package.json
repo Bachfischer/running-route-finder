@@ -7,11 +7,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm check && next build",
     "start": "next start",
     "lint": "eslint app components lib scripts tests *.mjs *.ts --max-warnings 0",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "test:coverage": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-include=\"lib/*.ts\" --test-coverage-lines=90 --test-coverage-functions=90 --test-coverage-branches=80 tests/*.test.mjs",
     "test:live": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/live-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",

@@ -24,7 +24,8 @@ jobs:
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm run audit
-      - run: pnpm check
+      # Vercel rewrites this file before its build; exercise that state in CI.
+      - run: node -e "const fs = require('node:fs'); const p = 'vercel.json'; fs.writeFileSync(p, JSON.stringify(JSON.parse(fs.readFileSync(p, 'utf8'))))"
       - run: pnpm build
       - run: pnpm test:server
       - run: pnpm exec playwright install --with-deps chromium

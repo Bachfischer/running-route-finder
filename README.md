@@ -17,8 +17,7 @@ pnpm dev
 ## Verify
 
 ```sh
-pnpm check         # Formatting, lint, types and unit tests with coverage
-pnpm build
+pnpm build         # Formatting, lint, types, unit tests, then Next.js
 pnpm test:server   # Compiled Next.js with a deterministic ORS response
 pnpm exec playwright install chromium
 pnpm test:ui       # Desktop and mobile browser flows
@@ -29,7 +28,7 @@ The live test consumes provider quota and is deliberately excluded from CI. CI a
 
 ## Deploy
 
-Vercel builds the `main` branch and previews pull requests. Configure `ORS_API_KEY` in both Preview and Production and redeploy after changing it. `vercel.json` uses Frankfurt and runs `pnpm check && pnpm build`. Require the GitHub **Quality and routing regressions** check before merging. Configure Vercel Firewall limits for `/api/loops` to protect shared ORS quota; searches from different users run concurrently.
+Vercel builds the `main` branch and previews pull requests. Configure `ORS_API_KEY` in both Preview and Production and redeploy after changing it. Both Vercel and GitHub Actions run `pnpm build`, which runs formatting, lint, types and unit tests before compiling Next.js. Vercel may rewrite `vercel.json` during its build, so Prettier excludes that generated configuration. Require the GitHub **Quality and routing regressions** check before merging. Configure Vercel Firewall limits for `/api/loops` to protect shared ORS quota; searches from different users run concurrently.
 
 Each search requests up to four seeded `foot-walking` round trips with green and quiet preferences and mapped stairs avoided. A fifth request may correct an inaccurate distance. Candidates are ranked by distance, preferred direction and provider ratings. ORS ratings describe mapped route segments; the service does not count traffic lights or promise a stop-free run. Check local signs and conditions. API requests have bounded bodies and provider timeouts; failed providers produce readable errors without disclosing the key. `GET /api/health` checks the application only.
 

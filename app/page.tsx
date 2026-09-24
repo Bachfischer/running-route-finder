@@ -14,11 +14,12 @@ import {
   ArrowRight,
   Flag,
   Compass,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toGpx } from "@/lib/gpx";
-import { SiteFooter } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import type { LoopResult } from "@/lib/route";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
@@ -643,6 +644,14 @@ export default function Home() {
                 </p>
               )}
             </div>
+            <a
+              className="source-link"
+              href="https://github.com/Bachfischer/running-route-finder"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink size={16} /> View source on GitHub
+            </a>
           </div>
           <div className="sidebar-footer">
             <Route size={17} />

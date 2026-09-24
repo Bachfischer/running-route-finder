@@ -293,6 +293,13 @@ a {
   padding-top: 22px;
   margin-top: auto;
 }
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 13px;
+}
 .sidebar-footer svg {
   flex-shrink: 0;
 }

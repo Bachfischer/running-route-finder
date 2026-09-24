@@ -61,6 +61,12 @@ test("initial state has no fabricated route and requires a start", async ({
   page,
 }) => {
   await expect(
+    page.getByRole("link", { name: "View source on GitHub" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/Bachfischer/running-route-finder",
+  );
+  await expect(
     page.getByRole("button", { name: "Find a running route", exact: true }),
   ).toBeDisabled();
   await expect(page.getByRole("button", { name: "Download GPX" })).toHaveCount(
@@ -337,6 +343,9 @@ test("embedded planner hides surrounding website navigation", async ({
   ).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Plan your run" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "View source on GitHub" }),
   ).toBeVisible();
 });
 test("default direction is best available and compass choices are visible", async ({
