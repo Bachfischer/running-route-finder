@@ -3,7 +3,8 @@ export type RouteInput = {
   lat: number;
   lon: number;
   distance: number;
-  direction: string;
+  /** Accepted for older clients and embeds; the planner no longer uses it. */
+  direction?: string;
 };
 export type Loop = {
   coordinates: Coord[];
@@ -13,18 +14,18 @@ export type Loop = {
 };
 export type LoopResult = {
   routes: Loop[];
-  quality: { green: number | null; quiet: number | null }[];
+  quality: {
+    green: number | null;
+    quiet: number | null;
+    paths?: number | null;
+    /** Measured share of the route inside mapped parks and woods. */
+    park?: number | null;
+    /** Names of the parks the loop runs through, most time first. */
+    parks?: string[];
+    /** The offline Odeonsplatz corridor is approximate, not an OSM outline. */
+    parkApproximate?: boolean;
+  }[];
   snapDistance: number;
-};
-export const compass: Record<string, number> = {
-  N: 0,
-  NE: 45,
-  E: 90,
-  SE: 135,
-  S: 180,
-  SW: 225,
-  W: 270,
-  NW: 315,
 };
 export function meters(a: Coord, b: Coord): number {
   const radians = Math.PI / 180;

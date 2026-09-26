@@ -17,6 +17,7 @@ const invalid = [
   { ...valid, distance: 1.9 },
   { ...valid, distance: 25.1 },
   { ...valid, direction: "north" },
+  { ...valid, direction: 5 },
   { ...valid, direction: "__proto__" },
 ];
 for (const [i, input] of invalid.entries())

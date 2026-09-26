@@ -30,7 +30,7 @@
   padding: 0;
 }
 .button:hover {
-  background: #edf5f8;
+  background: #eaf5ec;
   color: #494e52;
 }
 .button:disabled {
@@ -57,7 +57,7 @@
   cursor: not-allowed;
 }
 :is(button, input, select, summary, a):focus-visible {
-  outline: 2px solid #39829a;
+  outline: 2px solid #46675b;
   outline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -73,8 +73,8 @@
   --site-text: #494e52;
   --site-gray: #7a8288;
   --site-line: #f2f3f3;
-  --site-cyan: #52adc8;
-  --site-link: #39829a;
+  --site-cyan: #6a9b75;
+  --site-link: #46675b;
 }
 body {
   margin: 0;
@@ -181,7 +181,7 @@ a {
   color: #7a8288;
 }
 .location-search:focus-within {
-  outline: 2px solid #52adc8;
+  outline: 2px solid #6a9b75;
 }
 .location-search input:focus-visible {
   box-shadow: none;
@@ -191,7 +191,7 @@ a {
   padding-left: 0;
   margin: 5px 0 20px;
   height: 30px;
-  color: #39829a;
+  color: #46675b;
 }
 .distance-label {
   display: flex;
@@ -251,9 +251,9 @@ a {
 }
 .presets [aria-pressed="true"],
 .alternatives [aria-pressed="true"] {
-  background: #edf6f8;
-  color: #2d6578;
-  border-color: #76afc0;
+  background: #eaf5ec;
+  color: #355448;
+  border-color: #93ba9b;
 }
 .optional {
   margin-left: auto;
@@ -349,19 +349,6 @@ a {
   box-shadow: 0 1px 3px #00000012;
   border-radius: 4px;
 }
-.north {
-  position: absolute;
-  right: 28px;
-  top: 112px;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-}
-.north svg {
-  transform: rotate(-45deg);
-}
 .empty-card,
 .result-card {
   position: absolute;
@@ -381,7 +368,7 @@ a {
   align-items: center;
 }
 .empty-icon {
-  color: #39829a;
+  color: #46675b;
   padding: 8px;
 }
 .empty-card h2 {
@@ -403,7 +390,7 @@ a {
 .eyebrow {
   font-size: 12px;
   font-weight: 700;
-  color: #39829a;
+  color: #46675b;
   letter-spacing: 0.5px;
 }
 .loop-tag {
@@ -654,7 +641,7 @@ a {
 }
 .recommendation-details summary {
   cursor: pointer;
-  color: #39829a;
+  color: #46675b;
   font-weight: 600;
 }
 .recommendation-details p {
@@ -662,7 +649,7 @@ a {
   line-height: 1.6;
 }
 .example-start {
-  color: #39829a;
+  color: #46675b;
   padding: 0;
   font-size: 13px;
   height: auto;
@@ -700,25 +687,16 @@ a {
 .intro {
   margin-bottom: 18px;
 }
-.direction-options {
-  margin: 18px 0 8px;
-  font-size: 14px;
-}
-
-.direction-options .field-label {
-  margin-top: 12px;
-}
-
 .alternative-options {
   margin: 12px 0;
   font-size: 14px;
 }
 
-/* Route planner: a calmer surface around the map and an interactive compass. */
+/* Route planner: a calmer surface around the map. */
 .app {
   --site-text: #494e52;
   --site-gray: #7a8288;
-  --site-link: #39829a;
+  --site-link: #46675b;
   background: #fff;
   min-height: 100vh;
 }
@@ -728,7 +706,7 @@ a {
 }
 .heading-kicker,
 .intro-kicker {
-  color: #39829a;
+  color: #46675b;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -785,9 +763,9 @@ a {
 .step-number {
   display: inline-grid;
   place-items: center;
-  background: #edf5f8;
+  background: #eaf5ec;
   border-radius: 7px;
-  color: #39829a;
+  color: #46675b;
   font-size: 10px;
   font-weight: 800;
   width: 24px;
@@ -795,7 +773,7 @@ a {
 }
 .location-search,
 .distance-control {
-  border-color: #becbd1;
+  border-color: #becdc1;
   border-radius: 10px;
   background: #fff;
 }
@@ -803,14 +781,14 @@ a {
   padding: 5px 6px 5px 10px;
 }
 .location-search > svg {
-  color: #39829a;
+  color: #46675b;
 }
 .location-search:focus-within {
-  outline-color: #52adc8;
+  outline-color: #6a9b75;
 }
 .locate,
 .example-start {
-  color: #39829a;
+  color: #46675b;
 }
 .distance-control {
   padding: 9px;
@@ -837,105 +815,26 @@ a {
 }
 .presets [aria-pressed="true"],
 .alternatives [aria-pressed="true"] {
-  background: #edf6f8;
-  border-color: #76afc0;
-  color: #39829a;
-}
-.direction-options {
-  padding: 17px 0 18px;
-  margin: 0 0 16px;
-  border-top: 1px solid #edf0f1;
-  border-bottom: 1px solid #edf0f1;
-}
-.direction-options .field-label {
-  margin: 0 0 12px;
-}
-.compass-layout {
-  display: flex;
-  align-items: center;
-  gap: 17px;
-}
-.compass {
-  display: grid;
-  grid-template-columns: repeat(3, 36px);
-  grid-template-rows: repeat(3, 36px);
-  place-items: center;
-  flex: none;
-  padding: 6px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    #fff 0 32%,
-    #edf5f8 33% 35%,
-    #f7fafb 36% 68%,
-    #d9eaf0 69% 71%,
-    #fff 72%
-  );
-  box-shadow: inset 0 0 0 1px #dce8ec;
-}
-.compass button {
-  display: grid;
-  place-items: center;
-  width: 33px;
-  height: 33px;
-  border: 0;
-  border-radius: 50%;
-  color: #718790;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 750;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    transform 0.15s;
-}
-.compass button:hover {
-  color: #2d6578;
-  background: #e4f2f6;
-}
-.compass button[aria-pressed="true"] {
-  color: #fff;
-  background: #39829a;
-  box-shadow: 0 2px 8px #2d65783d;
-}
-.compass button:active {
-  transform: scale(0.92);
-}
-.compass .compass-center {
-  width: 34px;
-  height: 34px;
-}
-.compass-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.compass-copy strong {
-  font-size: 13px;
-  color: #494e52;
-  line-height: 1.3;
-}
-.compass-copy span {
-  font-size: 12px;
-  color: #7a8288;
-  line-height: 1.4;
+  background: #eaf5ec;
+  border-color: #93ba9b;
+  color: #46675b;
 }
 .find-button {
   height: 50px;
   border-radius: 10px;
-  background: #39829a;
+  background: #46675b;
   padding: 0 16px;
-  box-shadow: 0 5px 12px #39829a26;
+  box-shadow: 0 5px 12px #46675b26;
 }
 .find-button:hover {
-  background: #2d6578;
+  background: #355448;
   color: #fff;
 }
 .sidebar-footer {
   color: #7a8288;
 }
 .sidebar-footer svg {
-  color: #39829a;
+  color: #46675b;
 }
 .map-panel {
   background: #edf0ee;
@@ -956,9 +855,9 @@ a {
   padding: 18px 20px;
 }
 .empty-icon {
-  background: #edf6f8;
+  background: #eaf5ec;
   border-radius: 10px;
-  color: #39829a;
+  color: #46675b;
 }
 .result-card {
   background: #fff;
@@ -966,29 +865,29 @@ a {
 }
 .eyebrow,
 .recommendation-details summary {
-  color: #39829a;
+  color: #46675b;
 }
 .export-button {
   border-radius: 9px;
-  border-color: #9ec5d1;
-  color: #39829a;
+  border-color: #a3c4aa;
+  color: #46675b;
 }
 .status {
   color: #646c72;
 }
 .places {
-  border-color: #becbd1;
+  border-color: #becdc1;
   border-radius: 10px;
 }
 .app :is(button, input, select, summary, a):focus-visible {
-  outline-color: #39829a;
+  outline-color: #46675b;
 }
 .app .button:hover:not(.find-button) {
-  background: #edf5f8;
-  color: #2d6578;
+  background: #eaf5ec;
+  color: #355448;
 }
 .app .button[aria-pressed="true"]:hover {
-  background: #dceff4;
+  background: #deefdf;
 }
 .embedded .workspace {
   border-radius: 0;
@@ -1025,4 +924,20 @@ a {
   .sidebar {
     padding: 18px;
   }
+}
+
+.via-parks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #eaf5ec;
+  color: #2f6b3b;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.via-parks svg {
+  flex: none;
 }

@@ -9,11 +9,10 @@ import {
   Download,
   Plus,
   Minus,
-  Navigation,
   LoaderCircle,
   ArrowRight,
   Flag,
-  Compass,
+  Trees,
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,23 +22,11 @@ import { SiteFooter } from "@/components/site-footer";
 import type { LoopResult } from "@/lib/route";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
-const compassPoints = [
-  { value: "NW", label: "Northwest" },
-  { value: "N", label: "North" },
-  { value: "NE", label: "Northeast" },
-  { value: "W", label: "West" },
-  { value: "Any", label: "Best available" },
-  { value: "E", label: "East" },
-  { value: "SW", label: "Southwest" },
-  { value: "S", label: "South" },
-  { value: "SE", label: "Southeast" },
-];
 export default function Home() {
   const [query, setQuery] = useState(""),
     [place, setPlace] = useState<Place | null>(null),
     [places, setPlaces] = useState<Place[]>([]),
     [distance, setDistance] = useState("10"),
-    [direction, setDirection] = useState("Any"),
     [busy, setBusy] = useState(false),
     [searching, setSearching] = useState(false),
     [error, setError] = useState(""),
@@ -168,9 +155,15 @@ export default function Home() {
       ).addTo(group);
       const line = L.polyline(
         chosen.coordinates.map((c) => [c[1], c[0]]),
-        { color: "#39829a", weight: 5 },
+        { color: "#46675b", weight: 5 },
       ).addTo(group);
-      map.fitBounds(line.getBounds(), { padding: [65, 65] });
+      map.fitBounds(line.getBounds(), { padding: [65, 65], animate: false });
+      // The result card changes the map size after render; refit once laid out.
+      requestAnimationFrame(() => {
+        if (mapRef.current !== map) return;
+        map.invalidateSize();
+        map.fitBounds(line.getBounds(), { padding: [65, 65], animate: false });
+      });
     }
     const start = chosen
       ? { lat: chosen.coordinates[0][1], lon: chosen.coordinates[0][0] }
@@ -298,7 +291,6 @@ export default function Home() {
           body: JSON.stringify({
             ...start,
             distance: Number(distance),
-            direction,
           }),
         },
         150000,
@@ -358,12 +350,12 @@ export default function Home() {
         <>
           <div className="project-heading">
             <div className="heading-kicker">
-              <Compass size={15} /> THE RUNNING ROUTE FINDER
+              <Trees size={15} /> THE RUNNING ROUTE FINDER
             </div>
             <h1>Running route finder</h1>
             <p>
-              A better way out the door. Find a loop from wherever you are, with
-              greener and quieter paths along the way.
+              A better way out the door. Pick a start and a distance, and get a
+              loop through the best parks nearby.
             </p>
           </div>
         </>
@@ -371,11 +363,9 @@ export default function Home() {
       <div className="workspace">
         <aside className="sidebar">
           <div className="intro">
-            <span className="intro-kicker">YOUR ROUTE, YOUR WAY</span>
+            <span className="intro-kicker">PARKS FIRST</span>
             <h2>Plan your run</h2>
-            <p>
-              Set your start, pick a distance, and head in a direction you like.
-            </p>
+            <p>Where do you start, and how far do you want to go?</p>
           </div>
           <div className="form">
             <fieldset disabled={busy || !hydrated}>
@@ -465,7 +455,6 @@ export default function Home() {
                   setQuery("Odeonsplatz, Munich");
                   setPlaces([]);
                   setDistance("10");
-                  setDirection("N");
                   setResult(null);
                   setError("");
                 }}
@@ -525,7 +514,7 @@ export default function Home() {
               <p id="distance-help" className="field-hint">
                 {Number(distance) < 2 || Number(distance) > 25
                   ? "Enter a distance between 2 and 25 km."
-                  : "Green and quiet paths preferred where available."}
+                  : "Routed through parks and green space wherever possible."}
               </p>
               <div className="presets">
                 {[3, 5, 10, 21.1].map((k) => (
@@ -541,53 +530,6 @@ export default function Home() {
                     {k} km
                   </Button>
                 ))}
-              </div>
-              <div className="direction-options">
-                <div className="field-label" id="direction-label">
-                  <span className="step-number">03</span> Preferred direction
-                  <span className="optional">Optional</span>
-                </div>
-                <div className="compass-layout">
-                  <div
-                    className="compass"
-                    role="group"
-                    aria-labelledby="direction-label"
-                  >
-                    {compassPoints.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={
-                          value === "Any" ? "compass-center" : "compass-point"
-                        }
-                        aria-label={label}
-                        aria-pressed={direction === value}
-                        onClick={() => {
-                          setDirection(value);
-                          setResult(null);
-                        }}
-                      >
-                        {value === "Any" ? (
-                          <Compass size={21} strokeWidth={1.8} />
-                        ) : (
-                          value
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="compass-copy">
-                    <strong>
-                      {direction === "Any"
-                        ? "Anywhere is good"
-                        : `Head ${compassPoints.find((point) => point.value === direction)?.label.toLowerCase()}`}
-                    </strong>
-                    <span>
-                      {direction === "Any"
-                        ? "We'll find the best loop around your start."
-                        : "We'll look for a loop on this side of your start."}
-                    </span>
-                  </div>
-                </div>
               </div>
             </fieldset>
             <Button
@@ -635,7 +577,8 @@ export default function Home() {
               )}
               {busy && (
                 <p className="status">
-                  Finding walking loops with green and quiet preferences.
+                  Looking for the best parks nearby and routing a loop through
+                  them.
                 </p>
               )}
               {error && (
@@ -695,10 +638,6 @@ export default function Home() {
                 <Minus />
               </Button>
             </div>
-            <div className="north">
-              <Navigation size={19} />
-              <span>N</span>
-            </div>
             {!result && !busy && (
               <div className="empty-card">
                 <div className="empty-icon">
@@ -722,8 +661,8 @@ export default function Home() {
               <div className="empty-card">
                 <LoaderCircle className="spin" />
                 <div>
-                  <h2>Finding a smoother run.</h2>
-                  <p>Comparing distance, direction and green/quiet ratings.</p>
+                  <h2>Finding a greener run.</h2>
+                  <p>Mapping parks nearby and routing loops through them.</p>
                 </div>
               </div>
             )}
@@ -755,7 +694,25 @@ export default function Home() {
                   <span>from your target</span>
                 </div>
               </div>
+              {(result.quality?.[selected]?.parks?.length ?? 0) > 0 && (
+                <p className="via-parks">
+                  <Trees size={17} />
+                  <span>
+                    Through{" "}
+                    <strong>
+                      {result.quality[selected].parks!.join(" · ")}
+                    </strong>
+                  </span>
+                </p>
+              )}
               <div className="route-facts">
+                {result.quality?.[selected]?.park != null && (
+                  <span>
+                    {result.quality[selected].parkApproximate ? "About " : ""}
+                    {Math.round(result.quality[selected].park! * 100)}% in parks
+                    and woods
+                  </span>
+                )}
                 <span>
                   {result.quality?.[selected]?.green == null
                     ? "Green rating unavailable"
@@ -798,11 +755,13 @@ export default function Home() {
               <details className="recommendation-details">
                 <summary>Why this loop?</summary>
                 <p>
-                  We request four walking loops with green and quiet preferences
-                  and avoid mapped stairs. One extra request may adjust the
-                  length. We rank routes by target distance, direction and
-                  provider ratings. Traffic lights and crossings are not
-                  counted; check the map and local signs before running.
+                  We map the parks, woods and lakes around your start from
+                  OpenStreetMap, then place waypoints deep inside the largest
+                  parks you can reach so the loop matches your distance. Loops
+                  are ranked by how much of the run is actually in green space,
+                  then by distance and path quality. Stairs are avoided where
+                  mapped. Traffic lights are not counted; check local signs
+                  before running.
                 </p>
               </details>
               <p className="route-note">

@@ -9,17 +9,26 @@ const input = {
   lat: 48.142,
   lon: 11.577,
   distance: 10,
-  direction: "N",
 };
 const result = await searchOrs(
   input,
   process.env.ORS_API_KEY,
   new AbortController().signal,
 );
-assert.ok(Math.abs(result.routes[0].distance - 10000) < 1500);
+const best = result.quality[0];
 console.log(
   JSON.stringify({
     km: result.routes[0].distance / 1000,
-    green: result.quality?.[0]?.green,
+    park: best.park,
+    parks: best.parks,
+    green: best.green,
+    alternatives: result.routes.length,
   }),
 );
+assert.ok(Math.abs(result.routes[0].distance - 10000) < 1000);
+// Acceptance: 10 km from Odeonsplatz goes through Englischer Garten.
+assert.ok(
+  best.parks?.includes("Englischer Garten"),
+  "not via Englischer Garten",
+);
+assert.ok((best.park ?? 0) > 0.5, "less than half the loop in parks");
