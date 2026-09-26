@@ -24,10 +24,10 @@ const areas = parseOverpass(munichParks);
 const inEG = (p) =>
   inside(p, englischerGartenSouth) || inside(p, englischerGartenNorth);
 
-test("park source explicitly selects the bundled Odeonsplatz corridor", async () => {
+test("park source prefers mapped parks and uses the corridor on outage", async () => {
   const signal = new AbortController().signal;
   const offline = () => {
-    throw Error("Odeonsplatz should not request Overpass");
+    throw Error("Overpass unavailable");
   };
   const local = await parkSource(offline)(odeonsplatz, 10000, signal);
   assert.equal(local.approximate, true);
@@ -39,6 +39,12 @@ test("park source explicitly selects the bundled Odeonsplatz corridor", async ()
   );
   assert.equal(remote.approximate, false);
   assert.ok(remote.componentName.includes("Englischer Garten"));
+  const preferred = await parkSource(async () => Response.json(munichParks))(
+    odeonsplatz,
+    10000,
+    signal,
+  );
+  assert.equal(preferred.approximate, false);
   const outside = await parkSource(async () => Response.json({ elements: [] }))(
     [11.7, 48.2],
     10000,

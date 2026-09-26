@@ -21,13 +21,18 @@ export function mappedParks(fetcher: Fetcher = fetch): ParkSource {
   };
 }
 
-/** The Odeonsplatz corridor is an explicit, approximate exception. */
+/** Prefer current mapped green space; use the bundled corridor only on outage. */
 export function parkSource(fetcher: Fetcher = fetch): ParkSource {
   const remote = mappedParks(fetcher);
-  return (start, target, signal) => {
+  return async (start, target, signal) => {
     const local = odeonsplatzCorridor(start);
-    return local
-      ? Promise.resolve(new GreenMask(start, reach(target), local, 0, true))
-      : remote(start, target, signal);
+    try {
+      const mapped = await remote(start, target, signal);
+      if (mapped) return mapped;
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!local) throw error;
+    }
+    return local ? new GreenMask(start, reach(target), local, 0, true) : null;
   };
 }

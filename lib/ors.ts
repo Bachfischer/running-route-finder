@@ -27,6 +27,8 @@ export type Quality = {
   green: number | null;
   quiet: number | null;
   paths?: number | null;
+  unpaved?: number | null;
+  streets?: number | null;
   park?: number | null;
   parks?: string[];
   parkApproximate?: boolean;
@@ -70,18 +72,20 @@ export function quality(
 }
 
 /**
- * Rank a route. Time inside real parks dominates; ORS's street-level green,
- * path and quiet ratings break ties; length must stay close to the target.
+ * Prefer time in mapped nature, then natural surfaces and paths over streets.
+ * Distance remains a constraint, with a steep penalty for large misses.
  */
 export function routeScore(distance: number, target: number, q: Quality) {
   const error = Math.abs(distance - target) / target;
   return (
     error * 2 +
-    Math.max(0, error - 0.1) * 8 -
-    (q.park ?? 0) * 3 -
-    (q.green ?? 0) * 0.8 -
-    (q.paths ?? 0) * 0.5 -
-    (q.quiet ?? 0) * 0.3
+    Math.max(0, error - 0.1) * 12 -
+    (q.park ?? 0) * 5 -
+    (q.unpaved ?? 0) * 1.5 -
+    (q.paths ?? 0) * 1.2 +
+    (q.streets ?? 0) * 1.2 -
+    (q.green ?? 0) * 0.6 -
+    (q.quiet ?? 0) * 0.2
   );
 }
 
@@ -131,6 +135,13 @@ export function parseRoute(
     // ORS names this response field `waytypes`; the request uses `waytype`.
     paths: quality(extras?.waytypes ?? extras?.waytype, coordinates, (v) =>
       [4, 5, 7].includes(v),
+    ),
+    // ORS surface IDs: unpaved, compacted/gravel, earth, ground and grass.
+    unpaved: quality(extras?.surface, coordinates, (v) =>
+      [2, 8, 10, 11, 12, 17].includes(v),
+    ),
+    streets: quality(extras?.waytypes ?? extras?.waytype, coordinates, (v) =>
+      [1, 2, 3].includes(v),
     ),
     park: measured ? measured.park : null,
     parks: measured?.parks ?? [],
@@ -207,7 +218,7 @@ export async function searchOrs(
         },
         body: JSON.stringify({
           instructions: false,
-          extra_info: ["green", "noise", "waytype"],
+          extra_info: ["green", "noise", "waytype", "surface"],
           ...body,
         }),
       },
@@ -219,13 +230,14 @@ export async function searchOrs(
     const coordinates = [start, ...plan.waypoints, start];
     const data = await post({
       coordinates,
-      // Waypoints sit inside parks; allow snapping to the nearest park path.
+      // Keep waypoints on nearby paths instead of snapping across a park
+      // boundary to a faster street hundreds of metres away.
       radiuses: coordinates.map((_, i) =>
-        i === 0 || i === coordinates.length - 1 ? 350 : 600,
+        i === 0 || i === coordinates.length - 1 ? 350 : 120,
       ),
       options: {
         avoid_features: ["steps", "ferries"],
-        profile_params: { weightings: { green: 0.5, quiet: 0.5 } },
+        profile_params: { weightings: { green: 1, quiet: 0.2 } },
       },
     });
     return { ...parseRoute(data, start, target, mask), plan };
@@ -272,6 +284,17 @@ export async function searchOrs(
 
   if (mask) {
     await tryPlans(planGreenLoops(mask, start, target, { count: 3 }));
+    // A waypoint inside a park is no proof that ORS stayed on its paths.
+    // Explore different waypoint shapes when the actual geometry is street-heavy.
+    const natureEnough = (f: Found) =>
+      (f.quality.park ?? 0) >= 0.55 && (f.quality.streets ?? 0) <= 0.25;
+    if (!found.some(natureEnough))
+      await tryPlans(
+        planGreenLoops(mask, start, target, {
+          count: 2,
+          avoid: requested,
+        }),
+      );
     // Up to two calibration passes using the detour factor ORS actually took.
     for (let pass = 0; pass < 2; pass++) {
       const top = best();
@@ -297,7 +320,9 @@ export async function searchOrs(
   }
 
   // Fallback / extra variety: seeded ORS round trips.
-  const parkRoutes = found.filter((f) => f.plan).length;
+  const parkRoutes = found.filter(
+    (f) => f.plan && (f.quality.park ?? 0) >= 0.55,
+  ).length;
   if (parkRoutes < 2) {
     // ORS green/quiet preferences often yield a longer actual route than the
     // round-trip length hint. The correction below handles other areas.
