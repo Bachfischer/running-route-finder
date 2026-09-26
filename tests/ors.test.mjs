@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseRoute, quality, searchOrs as runSearch } from "../lib/ors.ts";
+import {
+  parseRoute,
+  quality,
+  routeScore,
+  searchOrs as runSearch,
+} from "../lib/ors.ts";
 import { mappedParks } from "../lib/park-source.ts";
 import { ProviderError, ProviderTimeoutError } from "../lib/errors.ts";
 import { createHandlers } from "../lib/http.ts";
@@ -84,7 +89,12 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     quiet: 1,
   });
   assert.deepEqual(calls[0].body.options.avoid_features, ["steps", "ferries"]);
-  assert.deepEqual(calls[0].body.extra_info, ["green", "noise", "waytype"]);
+  assert.deepEqual(calls[0].body.extra_info, [
+    "green",
+    "noise",
+    "waytype",
+    "surface",
+  ]);
   assert.equal(result.routes[0].distance, 10100);
   assert.deepEqual(
     result.routes[0].coordinates[0],
@@ -120,6 +130,8 @@ test("unknown provider statistics do not invent green coverage", () => {
   assert.equal(result.quality.green, null);
   assert.equal(result.quality.quiet, null);
   assert.equal(result.quality.paths, null);
+  assert.equal(result.quality.unpaved, null);
+  assert.equal(result.quality.streets, null);
   assert.equal(result.quality.park, null);
 });
 for (const malformed of [
@@ -299,6 +311,11 @@ test("10 km from Odeonsplatz runs through Englischer Garten, not the Altstadt", 
   assert.ok(best.coordinates.slice(1, -1).every(inEnglischerGarten));
   assert.deepEqual(best.options.avoid_features, ["steps", "ferries"]);
   assert.equal(best.radiuses.length, best.coordinates.length);
+  assert.ok(best.radiuses.slice(1, -1).every((r) => r === 120));
+  assert.deepEqual(best.options.profile_params.weightings, {
+    green: 1,
+    quiet: 0.2,
+  });
   assert.ok(result.quality[0].park > 0.6, JSON.stringify(result.quality[0]));
   assert.deepEqual(result.quality[0].parks.slice(0, 1), ["Englischer Garten"]);
   assert.ok(Math.abs(result.routes[0].distance - 10000) / 10000 < 0.1);
@@ -323,6 +340,30 @@ test("park loops are length-calibrated with the observed detour", async () => {
     String(result.routes[0].distance),
   );
   assert.ok(result.quality[0].park > 0.5);
+});
+
+test("street-heavy park waypoint routes trigger alternative green plans", async () => {
+  clearGreenCache();
+  let plans = 0;
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    async (url, init) => {
+      if (isOverpass(url)) return Response.json(munichParks);
+      const body = JSON.parse(init.body);
+      if (body.options.round_trip) return Response.json(sample(false));
+      plans++;
+      if (plans > 3) return Response.json(fakeDirections(body.coordinates));
+      const street = sample(false);
+      street.features[0].properties.extras.waytypes = {
+        values: [[0, 3, 3]],
+      };
+      return Response.json(street);
+    },
+  );
+  assert.ok(plans > 3, `${plans} plans`);
+  assert.ok(result.quality[0].park > 0.55);
 });
 
 test("park data outage falls back to ORS round trips", async () => {
@@ -376,10 +417,45 @@ test("failed park routes fall back to round trips but surface quota errors", asy
 });
 
 test("route score prefers park time over tree-lined streets", async () => {
-  const { routeScore } = await import("../lib/ors.ts");
   const street = routeScore(10000, 10000, { green: 1, quiet: 0.5, park: 0.05 });
   const park = routeScore(10400, 10000, { green: 0.7, quiet: 0.8, park: 0.8 });
   assert.ok(park < street);
   const tooLong = routeScore(13500, 10000, { green: 1, quiet: 1, park: 1 });
   assert.ok(park < tooLong);
+});
+
+test("gravel park route beats a shorter green-rated city street", () => {
+  const city = routeScore(10000, 10000, {
+    park: 0.1,
+    green: 1,
+    paths: 0.1,
+    streets: 0.85,
+    unpaved: 0,
+    quiet: 0.7,
+  });
+  const nature = routeScore(10700, 10000, {
+    park: 0.75,
+    green: 0.8,
+    paths: 0.85,
+    streets: 0.1,
+    unpaved: 0.7,
+    quiet: 0.8,
+  });
+  assert.ok(nature < city);
+  const raw = sample();
+  raw.features[0].properties.extras.surface = {
+    values: [
+      [0, 2, 10],
+      [2, 3, 3],
+    ],
+  };
+  raw.features[0].properties.extras.waytypes = {
+    values: [
+      [0, 2, 4],
+      [2, 3, 3],
+    ],
+  };
+  const result = parseRoute(raw, origin, 10000);
+  assert.ok(result.quality.unpaved > 0);
+  assert.ok(result.quality.streets > 0);
 });

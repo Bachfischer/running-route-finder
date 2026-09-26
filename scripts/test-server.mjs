@@ -90,7 +90,7 @@ try {
     assert.equal(result.quality[0].green, 1);
     assert.equal(result.quality[0].quiet, 1);
     assert.ok(result.quality[0].park > 0.5, JSON.stringify(result.quality[0]));
-    assert.equal(result.quality[0].parkApproximate, true);
+    assert.equal(result.quality[0].parkApproximate, false);
     assert.equal(result.quality[0].parks[0], "Englischer Garten");
     assert.deepEqual(route.coordinates[0], route.coordinates.at(-1));
     console.log(
@@ -98,9 +98,9 @@ try {
     );
   }
   assert.ok(output.includes("TEST_PROVIDER_ORS"), output);
-  assert.ok(!output.includes("TEST_PROVIDER_OVERPASS"), output);
+  assert.ok(output.includes("TEST_PROVIDER_OVERPASS"), output);
   console.log(
-    "Validation, coordinate lookup and offline park-first ORS route passed.",
+    "Validation, coordinate lookup and mapped park-first ORS route passed.",
   );
 } catch (error) {
   console.error(output);
