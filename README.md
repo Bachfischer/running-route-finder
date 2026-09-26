@@ -32,7 +32,7 @@ Vercel builds the `main` branch and previews pull requests. Configure `ORS_API_K
 
 ### How loops are chosen (parks first)
 
-1. **Map the green space.** Parks, woods, recreation grounds and lakes within reach of the start (≈ target ÷ 2.4) are rasterised into a grid. Connected green areas are sized; large parks (≥ 15 ha, e.g. Englischer Garten) count fully, pocket parks less. Lakes are cut out.
+1. **Map the green space.** Parks, woods, recreation grounds and lakes within reach of the start (≈ target ÷ 2.4) are rasterised into a grid. Connected green areas are sized; large parks (≥ 15 ha, e.g. Englischer Garten) count fully, pocket parks less. Lakes are cut out. The Odeonsplatz example uses a bundled approximate Englischer Garten corridor so a public map-service outage does not send it back onto streets; its displayed coverage is labeled approximate.
 2. **Plan waypoints inside parks.** Candidate points are taken deep inside green areas. Every start → A → B (→ C) → start combination is scored by the share of its straight legs that lie in green space and how well its expected length (straight × detour factor 1.3) matches the target; sharp out-and-back spurs are penalised. The three best, mutually distinct plans are routed in parallel with ORS `foot-walking` (stairs and ferries avoided, mild green/quiet weighting).
 3. **Calibrate length.** If the best loop is more than 7 % off, the observed detour factor is fed back into the planner and up to two corrected plans are routed.
 4. **Rank by real park time.** Each route's geometry is measured against the park grid. Ranking: share inside parks first, then distance error, ORS green, path and quiet ratings. The result names the parks the loop runs through.

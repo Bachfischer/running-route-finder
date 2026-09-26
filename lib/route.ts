@@ -22,6 +22,8 @@ export type LoopResult = {
     park?: number | null;
     /** Names of the parks the loop runs through, most time first. */
     parks?: string[];
+    /** The offline Odeonsplatz corridor is approximate, not an OSM outline. */
+    parkApproximate?: boolean;
   }[];
   snapDistance: number;
 };

@@ -5,6 +5,7 @@ import {
   clearGreenCache,
   fetchGreenAreas,
   overpassQuery,
+  odeonsplatzFallback,
   parseOverpass,
   reach,
   stitch,
@@ -103,6 +104,17 @@ test("mask measures park share, names parks and removes lakes", () => {
   assert.equal(city.park, 0);
   assert.deepEqual(city.parks, []);
   assert.deepEqual(mask.measure([odeonsplatz, odeonsplatz]).park, 0);
+});
+
+test("Odeonsplatz offline corridor keeps waypoints inside the garden", () => {
+  const fallback = odeonsplatzFallback(odeonsplatz);
+  assert.ok(fallback);
+  assert.equal(odeonsplatzFallback([11.7, 48.142]), null);
+  const mask = new GreenMask(odeonsplatz, reach(10000), fallback, 0, true);
+  assert.equal(mask.approximate, true);
+  const plans = planGreenLoops(mask, odeonsplatz, 10000);
+  assert.ok(plans.length >= 2);
+  assert.ok(plans[0].waypoints.every(inEG));
 });
 
 test("planner sends 5, 10 and 15 km Odeonsplatz loops into Englischer Garten", () => {

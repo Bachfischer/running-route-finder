@@ -708,6 +708,7 @@ export default function Home() {
               <div className="route-facts">
                 {result.quality?.[selected]?.park != null && (
                   <span>
+                    {result.quality[selected].parkApproximate ? "About " : ""}
                     {Math.round(result.quality[selected].park! * 100)}% in parks
                     and woods
                   </span>

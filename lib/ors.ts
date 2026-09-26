@@ -1,5 +1,10 @@
 import { ProviderError, ProviderTimeoutError } from "./errors.ts";
-import { fetchGreenAreas, GreenMask, reach } from "./green.ts";
+import {
+  fetchGreenAreas,
+  GreenMask,
+  odeonsplatzFallback,
+  reach,
+} from "./green.ts";
 import { planGreenLoops, type Plan } from "./planner.ts";
 import {
   meters,
@@ -28,6 +33,7 @@ export type Quality = {
   paths?: number | null;
   park?: number | null;
   parks?: string[];
+  parkApproximate?: boolean;
 };
 type Found = { route: Loop; quality: Quality; plan?: Plan; seed?: number };
 
@@ -132,6 +138,7 @@ export function parseRoute(
     ),
     park: measured ? measured.park : null,
     parks: measured?.parks ?? [],
+    parkApproximate: mask?.approximate ?? false,
   };
   return {
     route: {
@@ -175,21 +182,29 @@ export async function searchOrs(
   const target = input.distance * 1000;
   signal.throwIfAborted();
   let mask: GreenMask | null = null;
-  try {
-    const radius = reach(target);
-    const areas = await fetchGreenAreas(start, radius, signal, fetcher);
-    if (areas.some((a) => !a.hole)) mask = new GreenMask(start, radius, areas);
-  } catch (error) {
-    // Park data is an enhancement; ORS round trips still produce a loop.
-    signal.throwIfAborted();
-    console.warn(
-      "park data unavailable",
-      error instanceof ProviderError
-        ? error.status
-        : error instanceof Error
-          ? error.name
-          : "unknown",
-    );
+  const radius = reach(target);
+  // Live Odeonsplatz searches should not wait for overloaded outline servers.
+  // An injected fetcher still exercises the normal provider path in tests.
+  const local = fetcher === fetch ? odeonsplatzFallback(start) : null;
+  if (local) {
+    mask = new GreenMask(start, radius, local, 0, true);
+  } else {
+    try {
+      const areas = await fetchGreenAreas(start, radius, signal, fetcher);
+      if (areas.some((a) => !a.hole))
+        mask = new GreenMask(start, radius, areas);
+    } catch (error) {
+      // Park data is an enhancement; ORS round trips still produce a loop.
+      signal.throwIfAborted();
+      console.warn(
+        "park data unavailable",
+        error instanceof ProviderError
+          ? error.status
+          : error instanceof Error
+            ? error.name
+            : "unknown",
+      );
+    }
   }
 
   const post = (body: object) =>
