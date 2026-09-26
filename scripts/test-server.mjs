@@ -79,7 +79,6 @@ try {
         lat: 48.142,
         lon: 11.577,
         distance: 10,
-        direction: "N",
       }),
       signal: AbortSignal.timeout(60000),
     });
@@ -90,13 +89,16 @@ try {
     assert.ok(Math.abs(route.distance - 10000) < 500);
     assert.equal(result.quality[0].green, 1);
     assert.equal(result.quality[0].quiet, 1);
+    assert.ok(result.quality[0].park > 0.5, JSON.stringify(result.quality[0]));
+    assert.equal(result.quality[0].parks[0], "Englischer Garten");
     assert.deepEqual(route.coordinates[0], route.coordinates.at(-1));
     console.log(
       `Production Node.js API: ${(route.distance / 1000).toFixed(2)} km.`,
     );
   }
   assert.ok(output.includes("TEST_PROVIDER_ORS"), output);
-  console.log("Validation, coordinate lookup and ORS-backed route passed.");
+  assert.ok(output.includes("TEST_PROVIDER_OVERPASS"), output);
+  console.log("Validation, coordinate lookup and park-first ORS route passed.");
 } catch (error) {
   console.error(output);
   throw error;

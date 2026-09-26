@@ -19,7 +19,7 @@ export function validRouteInput(value: unknown): value is RouteInput {
     Math.abs(v.lon) <= 180 &&
     v.distance >= 2 &&
     v.distance <= 25 &&
-    directions.includes(v.direction)
+    (v.direction === undefined || directions.includes(v.direction))
   );
 }
 export function apiError(message: string, status: number, retry?: number) {
@@ -84,7 +84,7 @@ export function createHandlers(deps: Dependencies = {}) {
       }
       if (!validRouteInput(body))
         return apiError(
-          "Choose valid coordinates, a distance from 2 to 25 km, and a compass direction.",
+          "Choose valid coordinates and a distance from 2 to 25 km.",
           400,
         );
       try {

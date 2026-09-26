@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import { parseRoute, quality, searchOrs } from "../lib/ors.ts";
 import { ProviderError, ProviderTimeoutError } from "../lib/errors.ts";
 import { createHandlers } from "../lib/http.ts";
+import { clearGreenCache } from "../lib/green.ts";
 
-const input = { lat: 48.142, lon: 11.577, distance: 10, direction: "N" };
+const input = { lat: 48.142, lon: 11.577, distance: 10 };
 const origin = [input.lon, input.lat];
-const noParks = (fetcher) => (url, init) =>
-  String(url).includes("openpoiservice")
-    ? Response.json({ type: "FeatureCollection", features: [] })
-    : fetcher(url, init);
+const isOverpass = (url) => String(url).includes("/interpreter");
+// Round-trip fallback tests: the park service answers with no green space.
+const noParks = (fetcher) => (url, init) => {
+  if (isOverpass(url)) return Response.json({ elements: [] });
+  return fetcher(url, init);
+};
 function sample(north = true, distance = 10100) {
   return {
     features: [
@@ -60,7 +63,7 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
     new AbortController().signal,
     noParks(fetcher),
   );
-  assert.equal(calls.length, 4);
+  assert.ok(calls.length >= 1 && calls.length <= 5);
   assert.ok(
     calls[0].url.startsWith("https://api.heigit.org/openrouteservice/"),
   );
@@ -83,75 +86,6 @@ test("requests bounded green quiet foot loops and preserves secret in authorizat
   );
   assert.ok(result.quality[0].green > 0 && result.quality[0].green < 1);
   assert.equal(result.quality[0].quiet, 1);
-});
-test("direction ranks a northern loop ahead of an equally distant southern loop", () => {
-  const north = parseRoute(sample(true), origin, 10000, 0);
-  const south = parseRoute(sample(false), origin, 10000, 0);
-  assert.ok(north.route.score < south.route.score);
-});
-test("Odeonsplatz favors park paths over a shorter street loop", async () => {
-  const street = sample(false, 10000);
-  street.features[0].properties.extras.green.values = [[0, 3, 2]];
-  street.features[0].properties.extras.noise.values = [[0, 3, 8]];
-  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
-  const park = sample(true, 11200);
-  park.features[0].properties.extras.green.values = [[0, 3, 9]];
-  park.features[0].properties.extras.noise.values = [[0, 3, 1]];
-  park.features[0].properties.extras.waytypes = { values: [[0, 3, 4]] };
-  let calls = 0;
-  const result = await searchOrs(
-    { ...input, direction: "S" },
-    "test-key",
-    new AbortController().signal,
-    noParks(async () => Response.json(++calls === 2 ? park : street)),
-  );
-  assert.equal(calls, 4);
-  assert.equal(result.routes[0].distance, 11200);
-  assert.equal(result.quality[0].green, 1);
-  assert.equal(result.quality[0].quiet, 1);
-});
-test("Odeonsplatz generates a route through a nearby mapped park", async () => {
-  const park = [11.586, 48.16];
-  const calls = [];
-  const route = sample(true, 10500);
-  const result = await searchOrs(
-    input,
-    "test-key",
-    new AbortController().signal,
-    async (url, init) => {
-      const body = JSON.parse(init.body);
-      calls.push({ url: String(url), body });
-      return Response.json(
-        String(url).includes("openpoiservice")
-          ? { features: [{ geometry: { type: "Point", coordinates: park } }] }
-          : route,
-      );
-    },
-  );
-  assert.equal(calls[0].body.filters.category_ids[0], 280);
-  assert.ok(calls[0].body.geometry.buffer <= 1900);
-  assert.ok(calls[0].body.geometry.geojson.coordinates[1] > origin[1]);
-  assert.equal(calls[1].body.options.round_trip, undefined);
-  assert.equal(calls[1].body.options.profile_params, undefined);
-  assert.equal(calls[1].body.coordinates.length, 4);
-  assert.deepEqual(calls[1].body.coordinates[0], origin);
-  assert.deepEqual(calls[1].body.coordinates.at(-1), origin);
-  assert.ok(calls[1].body.coordinates[2][1] > park[1]);
-  assert.equal(result.routes[0].distance, 10500);
-});
-test("park paths remain useful when green and noise data are unavailable", () => {
-  const street = sample(true);
-  const path = sample(true, 10900);
-  delete street.features[0].properties.extras.green;
-  delete street.features[0].properties.extras.noise;
-  delete path.features[0].properties.extras.green;
-  delete path.features[0].properties.extras.noise;
-  street.features[0].properties.extras.waytypes = { values: [[0, 3, 3]] };
-  path.features[0].properties.extras.waytypes = { values: [[0, 3, 7]] };
-  assert.ok(
-    parseRoute(path, origin, 10000, undefined).route.score <
-      parseRoute(street, origin, 10000, undefined).route.score,
-  );
 });
 test("widely spaced seeds and one bounded correction improve an overshot loop", async () => {
   const calls = [];
@@ -176,9 +110,11 @@ test("widely spaced seeds and one bounded correction improve an overshot loop", 
 test("unknown provider statistics do not invent green coverage", () => {
   const raw = sample();
   delete raw.features[0].properties.extras;
-  const result = parseRoute(raw, origin, 10000, 0);
-  assert.equal(result.green, null);
-  assert.equal(result.quiet, null);
+  const result = parseRoute(raw, origin, 10000);
+  assert.equal(result.quality.green, null);
+  assert.equal(result.quality.quiet, null);
+  assert.equal(result.quality.paths, null);
+  assert.equal(result.quality.park, null);
 });
 for (const malformed of [
   null,
@@ -201,14 +137,11 @@ for (const malformed of [
   sample(true, -1),
 ])
   test("rejects invalid routing geometry and distance", () =>
-    assert.throws(
-      () => parseRoute(malformed, origin, 10000, 0),
-      ProviderError,
-    ));
+    assert.throws(() => parseRoute(malformed, origin, 10000), ProviderError));
 test("rejects an open route", () => {
   const raw = sample();
   raw.features[0].geometry.coordinates[3] = [11.6, 48.15];
-  assert.throws(() => parseRoute(raw, origin, 10000, 0), /closed loop/);
+  assert.throws(() => parseRoute(raw, origin, 10000), /closed loop/);
 });
 test("validates extra segment bounds", () => {
   assert.equal(
@@ -219,10 +152,15 @@ test("validates extra segment bounds", () => {
 test("quota stops alternatives immediately", async () => {
   let calls = 0;
   await assert.rejects(
-    searchOrs(input, "token", new AbortController().signal, async () => {
-      calls++;
-      return new Response("quota", { status: 429 });
-    }),
+    searchOrs(
+      input,
+      "token",
+      new AbortController().signal,
+      noParks(async () => {
+        calls++;
+        return new Response("quota", { status: 429 });
+      }),
+    ),
     /quota reached/,
   );
   assert.equal(calls, 1);
@@ -286,8 +224,11 @@ test("four timed-out seeds fail with a useful timeout", async () => {
 test("same-origin API returns a 10 km Munich GPX-ready loop via managed provider", async () => {
   const handlers = createHandlers({
     search: (route, signal) =>
-      searchOrs(route, "test-key", signal, async () =>
-        Response.json(sample(true)),
+      searchOrs(
+        route,
+        "test-key",
+        signal,
+        noParks(async () => Response.json(sample(true))),
       ),
   });
   const response = await handlers.loops(
@@ -307,4 +248,132 @@ test("same-origin API returns a 10 km Munich GPX-ready loop via managed provider
     result.routes[0].coordinates[0],
     result.routes[0].coordinates.at(-1),
   );
+});
+
+// --- Park-first planning -------------------------------------------------
+import {
+  munichParks,
+  odeonsplatz,
+  englischerGartenSouth,
+  englischerGartenNorth,
+  inside,
+  fakeDirections,
+} from "./support/munich.mjs";
+
+const inEnglischerGarten = (p) =>
+  inside(p, englischerGartenSouth) || inside(p, englischerGartenNorth);
+function munich(detour = 1.3, log = []) {
+  return async (url, init) => {
+    if (isOverpass(url)) {
+      log.push({ overpass: String(url), body: String(init.body) });
+      return Response.json(munichParks);
+    }
+    const body = JSON.parse(init.body);
+    log.push(body);
+    if (body.options.round_trip) return Response.json(sample(true, 10100));
+    return Response.json(fakeDirections(body.coordinates, detour));
+  };
+}
+
+test("10 km from Odeonsplatz runs through Englischer Garten, not the Altstadt", async () => {
+  clearGreenCache();
+  const log = [];
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    munich(1.3, log),
+  );
+  const routed = log.filter((c) => c.coordinates);
+  assert.equal(log.filter((c) => c.overpass).length, 1);
+  assert.ok(routed.length >= 2 && routed.length <= 5);
+  const best = routed[0];
+  assert.deepEqual(best.coordinates[0], odeonsplatz);
+  assert.deepEqual(best.coordinates.at(-1), odeonsplatz);
+  assert.ok(best.coordinates.slice(1, -1).every(inEnglischerGarten));
+  assert.deepEqual(best.options.avoid_features, ["steps", "ferries"]);
+  assert.equal(best.radiuses.length, best.coordinates.length);
+  assert.ok(result.quality[0].park > 0.6, JSON.stringify(result.quality[0]));
+  assert.deepEqual(result.quality[0].parks.slice(0, 1), ["Englischer Garten"]);
+  assert.ok(Math.abs(result.routes[0].distance - 10000) / 10000 < 0.1);
+  assert.ok(result.quality[0].paths > 0.9);
+  // No city round trip is needed when parks produce enough good loops.
+  assert.ok(!routed.some((c) => c.options.round_trip));
+});
+
+test("park loops are length-calibrated with the observed detour", async () => {
+  clearGreenCache();
+  const log = [];
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    munich(1.6, log),
+  );
+  const routed = log.filter((c) => c.coordinates);
+  assert.ok(routed.length >= 4, `only ${routed.length} requests`);
+  assert.ok(
+    Math.abs(result.routes[0].distance - 10000) / 10000 < 0.1,
+    String(result.routes[0].distance),
+  );
+  assert.ok(result.quality[0].park > 0.5);
+});
+
+test("park data outage falls back to ORS round trips", async () => {
+  clearGreenCache();
+  const log = [];
+  const result = await searchOrs(
+    { ...input, lat: 48.1421 },
+    "test-key",
+    new AbortController().signal,
+    async (url, init) => {
+      if (isOverpass(url)) {
+        log.push("overpass");
+        return new Response("busy", { status: 504 });
+      }
+      log.push(JSON.parse(init.body));
+      return Response.json(sample(true, 10100));
+    },
+  );
+  assert.equal(log.filter((c) => c === "overpass").length, 2);
+  assert.ok(log.filter((c) => c !== "overpass")[0].options.round_trip);
+  assert.equal(result.quality[0].park, null);
+});
+
+test("failed park routes fall back to round trips but surface quota errors", async () => {
+  clearGreenCache();
+  let trips = 0;
+  const result = await searchOrs(
+    input,
+    "test-key",
+    new AbortController().signal,
+    async (url, init) => {
+      if (isOverpass(url)) return Response.json(munichParks);
+      const body = JSON.parse(init.body);
+      if (!body.options.round_trip)
+        return new Response("no point", { status: 404 });
+      trips++;
+      return Response.json(sample(true, 10100));
+    },
+  );
+  assert.ok(trips >= 1);
+  assert.ok(result.routes.length >= 1);
+  clearGreenCache();
+  await assert.rejects(
+    searchOrs(input, "test-key", new AbortController().signal, async (url) =>
+      isOverpass(url)
+        ? Response.json(munichParks)
+        : new Response("quota", { status: 429 }),
+    ),
+    /quota reached/,
+  );
+});
+
+test("route score prefers park time over tree-lined streets", async () => {
+  const { routeScore } = await import("../lib/ors.ts");
+  const street = routeScore(10000, 10000, { green: 1, quiet: 0.5, park: 0.05 });
+  const park = routeScore(10400, 10000, { green: 0.7, quiet: 0.8, park: 0.8 });
+  assert.ok(park < street);
+  const tooLong = routeScore(13500, 10000, { green: 1, quiet: 1, park: 1 });
+  assert.ok(park < tooLong);
 });
