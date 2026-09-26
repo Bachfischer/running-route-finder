@@ -179,9 +179,17 @@ export async function searchOrs(
     const radius = reach(target);
     const areas = await fetchGreenAreas(start, radius, signal, fetcher);
     if (areas.some((a) => !a.hole)) mask = new GreenMask(start, radius, areas);
-  } catch {
+  } catch (error) {
     // Park data is an enhancement; ORS round trips still produce a loop.
     signal.throwIfAborted();
+    console.warn(
+      "park data unavailable",
+      error instanceof ProviderError
+        ? error.status
+        : error instanceof Error
+          ? error.name
+          : "unknown",
+    );
   }
 
   const post = (body: object) =>
@@ -243,6 +251,15 @@ export async function searchOrs(
       if (s.status === "fulfilled") found.push(s.value);
       else if (s.reason instanceof ProviderError && s.reason.status === 429)
         throw quotaError();
+      else
+        console.warn(
+          "park route unavailable",
+          s.reason instanceof ProviderError
+            ? s.reason.status
+            : s.reason instanceof Error
+              ? s.reason.name
+              : "unknown",
+        );
     }
   };
   const accurate = (f: Found) =>

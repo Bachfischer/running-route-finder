@@ -155,7 +155,7 @@ export default function Home() {
       ).addTo(group);
       const line = L.polyline(
         chosen.coordinates.map((c) => [c[1], c[0]]),
-        { color: "#39829a", weight: 5 },
+        { color: "#46675b", weight: 5 },
       ).addTo(group);
       map.fitBounds(line.getBounds(), { padding: [65, 65], animate: false });
       // The result card changes the map size after render; refit once laid out.

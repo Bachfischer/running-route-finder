@@ -30,7 +30,7 @@
   padding: 0;
 }
 .button:hover {
-  background: #edf5f8;
+  background: #eaf5ec;
   color: #494e52;
 }
 .button:disabled {
@@ -57,7 +57,7 @@
   cursor: not-allowed;
 }
 :is(button, input, select, summary, a):focus-visible {
-  outline: 2px solid #39829a;
+  outline: 2px solid #46675b;
   outline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -73,8 +73,8 @@
   --site-text: #494e52;
   --site-gray: #7a8288;
   --site-line: #f2f3f3;
-  --site-cyan: #52adc8;
-  --site-link: #39829a;
+  --site-cyan: #6a9b75;
+  --site-link: #46675b;
 }
 body {
   margin: 0;
@@ -181,7 +181,7 @@ a {
   color: #7a8288;
 }
 .location-search:focus-within {
-  outline: 2px solid #52adc8;
+  outline: 2px solid #6a9b75;
 }
 .location-search input:focus-visible {
   box-shadow: none;
@@ -191,7 +191,7 @@ a {
   padding-left: 0;
   margin: 5px 0 20px;
   height: 30px;
-  color: #39829a;
+  color: #46675b;
 }
 .distance-label {
   display: flex;
@@ -251,9 +251,9 @@ a {
 }
 .presets [aria-pressed="true"],
 .alternatives [aria-pressed="true"] {
-  background: #edf6f8;
-  color: #2d6578;
-  border-color: #76afc0;
+  background: #eaf5ec;
+  color: #355448;
+  border-color: #93ba9b;
 }
 .optional {
   margin-left: auto;
@@ -368,7 +368,7 @@ a {
   align-items: center;
 }
 .empty-icon {
-  color: #39829a;
+  color: #46675b;
   padding: 8px;
 }
 .empty-card h2 {
@@ -390,7 +390,7 @@ a {
 .eyebrow {
   font-size: 12px;
   font-weight: 700;
-  color: #39829a;
+  color: #46675b;
   letter-spacing: 0.5px;
 }
 .loop-tag {
@@ -641,7 +641,7 @@ a {
 }
 .recommendation-details summary {
   cursor: pointer;
-  color: #39829a;
+  color: #46675b;
   font-weight: 600;
 }
 .recommendation-details p {
@@ -649,7 +649,7 @@ a {
   line-height: 1.6;
 }
 .example-start {
-  color: #39829a;
+  color: #46675b;
   padding: 0;
   font-size: 13px;
   height: auto;
@@ -696,7 +696,7 @@ a {
 .app {
   --site-text: #494e52;
   --site-gray: #7a8288;
-  --site-link: #39829a;
+  --site-link: #46675b;
   background: #fff;
   min-height: 100vh;
 }
@@ -706,7 +706,7 @@ a {
 }
 .heading-kicker,
 .intro-kicker {
-  color: #39829a;
+  color: #46675b;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -763,9 +763,9 @@ a {
 .step-number {
   display: inline-grid;
   place-items: center;
-  background: #edf5f8;
+  background: #eaf5ec;
   border-radius: 7px;
-  color: #39829a;
+  color: #46675b;
   font-size: 10px;
   font-weight: 800;
   width: 24px;
@@ -773,7 +773,7 @@ a {
 }
 .location-search,
 .distance-control {
-  border-color: #becbd1;
+  border-color: #becdc1;
   border-radius: 10px;
   background: #fff;
 }
@@ -781,14 +781,14 @@ a {
   padding: 5px 6px 5px 10px;
 }
 .location-search > svg {
-  color: #39829a;
+  color: #46675b;
 }
 .location-search:focus-within {
-  outline-color: #52adc8;
+  outline-color: #6a9b75;
 }
 .locate,
 .example-start {
-  color: #39829a;
+  color: #46675b;
 }
 .distance-control {
   padding: 9px;
@@ -815,26 +815,26 @@ a {
 }
 .presets [aria-pressed="true"],
 .alternatives [aria-pressed="true"] {
-  background: #edf6f8;
-  border-color: #76afc0;
-  color: #39829a;
+  background: #eaf5ec;
+  border-color: #93ba9b;
+  color: #46675b;
 }
 .find-button {
   height: 50px;
   border-radius: 10px;
-  background: #39829a;
+  background: #46675b;
   padding: 0 16px;
-  box-shadow: 0 5px 12px #39829a26;
+  box-shadow: 0 5px 12px #46675b26;
 }
 .find-button:hover {
-  background: #2d6578;
+  background: #355448;
   color: #fff;
 }
 .sidebar-footer {
   color: #7a8288;
 }
 .sidebar-footer svg {
-  color: #39829a;
+  color: #46675b;
 }
 .map-panel {
   background: #edf0ee;
@@ -855,9 +855,9 @@ a {
   padding: 18px 20px;
 }
 .empty-icon {
-  background: #edf6f8;
+  background: #eaf5ec;
   border-radius: 10px;
-  color: #39829a;
+  color: #46675b;
 }
 .result-card {
   background: #fff;
@@ -865,29 +865,29 @@ a {
 }
 .eyebrow,
 .recommendation-details summary {
-  color: #39829a;
+  color: #46675b;
 }
 .export-button {
   border-radius: 9px;
-  border-color: #9ec5d1;
-  color: #39829a;
+  border-color: #a3c4aa;
+  color: #46675b;
 }
 .status {
   color: #646c72;
 }
 .places {
-  border-color: #becbd1;
+  border-color: #becdc1;
   border-radius: 10px;
 }
 .app :is(button, input, select, summary, a):focus-visible {
-  outline-color: #39829a;
+  outline-color: #46675b;
 }
 .app .button:hover:not(.find-button) {
-  background: #edf5f8;
-  color: #2d6578;
+  background: #eaf5ec;
+  color: #355448;
 }
 .app .button[aria-pressed="true"]:hover {
-  background: #dceff4;
+  background: #deefdf;
 }
 .embedded .workspace {
   border-radius: 0;
