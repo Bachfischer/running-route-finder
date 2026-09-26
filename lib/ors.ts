@@ -1,10 +1,6 @@
 import { ProviderError, ProviderTimeoutError } from "./errors.ts";
-import {
-  fetchGreenAreas,
-  GreenMask,
-  odeonsplatzFallback,
-  reach,
-} from "./green.ts";
+import { type GreenMask } from "./green.ts";
+import { parkSource, type ParkSource } from "./park-source.ts";
 import { planGreenLoops, type Plan } from "./planner.ts";
 import {
   meters,
@@ -173,6 +169,7 @@ export async function searchOrs(
   key: string,
   signal: AbortSignal,
   fetcher: Fetcher = fetch,
+  loadParks: ParkSource = parkSource(fetcher),
 ): Promise<LoopResult> {
   if (!key.trim())
     throw new ProviderError(
@@ -182,29 +179,19 @@ export async function searchOrs(
   const target = input.distance * 1000;
   signal.throwIfAborted();
   let mask: GreenMask | null = null;
-  const radius = reach(target);
-  // Live Odeonsplatz searches should not wait for overloaded outline servers.
-  // An injected fetcher still exercises the normal provider path in tests.
-  const local = fetcher === fetch ? odeonsplatzFallback(start) : null;
-  if (local) {
-    mask = new GreenMask(start, radius, local, 0, true);
-  } else {
-    try {
-      const areas = await fetchGreenAreas(start, radius, signal, fetcher);
-      if (areas.some((a) => !a.hole))
-        mask = new GreenMask(start, radius, areas);
-    } catch (error) {
-      // Park data is an enhancement; ORS round trips still produce a loop.
-      signal.throwIfAborted();
-      console.warn(
-        "park data unavailable",
-        error instanceof ProviderError
-          ? error.status
-          : error instanceof Error
-            ? error.name
-            : "unknown",
-      );
-    }
+  try {
+    mask = await loadParks(start, target, signal);
+  } catch (error) {
+    // ORS can still find a loop if public park data is unavailable.
+    signal.throwIfAborted();
+    console.warn(
+      "park data unavailable",
+      error instanceof ProviderError
+        ? error.status
+        : error instanceof Error
+          ? error.name
+          : "unknown",
+    );
   }
 
   const post = (body: object) =>

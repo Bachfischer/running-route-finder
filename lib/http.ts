@@ -6,7 +6,6 @@ import {
 } from "./providers.ts";
 import { ProviderError, MapCapacityError } from "./errors.ts";
 import type { LoopResult, RouteInput } from "./route.ts";
-const directions = ["Any", "N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export function validRouteInput(value: unknown): value is RouteInput {
   if (!value || typeof value !== "object") return false;
   const v = value as RouteInput;
@@ -18,8 +17,7 @@ export function validRouteInput(value: unknown): value is RouteInput {
     Math.abs(v.lat) <= 85 &&
     Math.abs(v.lon) <= 180 &&
     v.distance >= 2 &&
-    v.distance <= 25 &&
-    (v.direction === undefined || directions.includes(v.direction))
+    v.distance <= 25
   );
 }
 export function apiError(message: string, status: number, retry?: number) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHandlers, validRouteInput, failure } from "../lib/http.ts";
 import { ProviderError, MapCapacityError } from "../lib/errors.ts";
 import { result, routeRequest } from "./helpers.mjs";
-const valid = { lat: 48.14, lon: 11.58, distance: 10, direction: "N" };
+const valid = { lat: 48.14, lon: 11.58, distance: 10 };
 const invalid = [
   null,
   [],
@@ -16,26 +16,25 @@ const invalid = [
   { ...valid, distance: "10" },
   { ...valid, distance: 1.9 },
   { ...valid, distance: 25.1 },
-  { ...valid, direction: "north" },
-  { ...valid, direction: 5 },
-  { ...valid, direction: "__proto__" },
 ];
-for (const [i, input] of invalid.entries())
-  test(`rejects invalid input ${i}`, async () => {
-    assert.equal(validRouteInput(input), false);
-    const h = createHandlers({
-      search: async () => {
-        throw Error("must not run");
-      },
-    });
-    assert.equal((await h.loops(routeRequest(input))).status, 400);
+test("rejects malformed coordinates and out-of-range distances", async () => {
+  const h = createHandlers({
+    search: async () => {
+      throw Error("must not run");
+    },
   });
-for (const input of [
-  { ...valid, lat: -85, lon: -180, distance: 2 },
-  { ...valid, lat: 85, lon: 180, distance: 25 },
-])
-  test(`accepts inclusive bounds ${JSON.stringify(input)}`, () =>
-    assert.ok(validRouteInput(input)));
+  for (const input of invalid) {
+    assert.equal(validRouteInput(input), false);
+    assert.equal((await h.loops(routeRequest(input))).status, 400);
+  }
+});
+test("accepts inclusive coordinate and distance bounds", () => {
+  for (const input of [
+    { ...valid, lat: -85, lon: -180, distance: 2 },
+    { ...valid, lat: 85, lon: 180, distance: 25 },
+  ])
+    assert.ok(validRouteInput(input));
+});
 test("success returns JSON with unmodified 10 km input and no-store", async () => {
   let seen;
   const h = createHandlers({

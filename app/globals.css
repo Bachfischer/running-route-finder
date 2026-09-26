@@ -677,16 +677,6 @@ a {
 }
 
 /* Keep the primary flow to start, distance and one action. */
-.project-heading {
-  margin-top: 20px;
-  margin-bottom: 18px;
-}
-.project-heading h1 {
-  margin-bottom: 8px;
-}
-.intro {
-  margin-bottom: 18px;
-}
 .alternative-options {
   margin: 12px 0;
   font-size: 14px;
@@ -895,7 +885,7 @@ a {
 }
 @media (max-width: 760px) {
   .project-heading {
-    margin: 22px 0 20px;
+    margin: 16px 0;
   }
   .project-heading h1 {
     font-size: 34px;
@@ -905,7 +895,7 @@ a {
     border-radius: 8px;
   }
   .sidebar {
-    padding: 22px;
+    padding: 18px;
   }
   .map-stage {
     min-height: 460px;
@@ -917,15 +907,6 @@ a {
     padding: 20px;
   }
 }
-@media (max-width: 760px) {
-  .project-heading {
-    margin: 16px 0;
-  }
-  .sidebar {
-    padding: 18px;
-  }
-}
-
 .via-parks {
   display: flex;
   align-items: center;
