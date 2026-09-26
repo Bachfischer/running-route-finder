@@ -99,7 +99,9 @@ try {
   }
   assert.ok(output.includes("TEST_PROVIDER_ORS"), output);
   assert.ok(!output.includes("TEST_PROVIDER_OVERPASS"), output);
-  console.log("Validation, coordinate lookup and offline park-first ORS route passed.");
+  console.log(
+    "Validation, coordinate lookup and offline park-first ORS route passed.",
+  );
 } catch (error) {
   console.error(output);
   throw error;
