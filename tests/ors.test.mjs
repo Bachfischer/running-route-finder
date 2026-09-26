@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseRoute, quality, searchOrs } from "../lib/ors.ts";
+import { parseRoute, quality, searchOrs as runSearch } from "../lib/ors.ts";
+import { mappedParks } from "../lib/park-source.ts";
 import { ProviderError, ProviderTimeoutError } from "../lib/errors.ts";
 import { createHandlers } from "../lib/http.ts";
-import { clearGreenCache } from "../lib/green.ts";
+
+// Routing tests inject the mapped source; the production-specific corridor has
+// its own focused test and a compiled-server integration check.
+const searchOrs = (input, key, signal, fetcher = fetch) =>
+  runSearch(input, key, signal, fetcher, mappedParks(fetcher));
+import { clearGreenCache } from "../lib/overpass.ts";
 
 const input = { lat: 48.142, lon: 11.577, distance: 10 };
 const origin = [input.lon, input.lat];

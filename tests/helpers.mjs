@@ -1,5 +1,5 @@
 export function routeRequest(
-  body = { lat: 48.14, lon: 11.58, distance: 10, direction: "Any" },
+  body = { lat: 48.14, lon: 11.58, distance: 10 },
   ip = "test",
 ) {
   return new Request("https://loop.test/api/loops", {

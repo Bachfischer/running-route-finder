@@ -1,16 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { GreenMask, reach } from "../lib/green.ts";
+import { odeonsplatzCorridor } from "../lib/known-parks.ts";
 import {
-  GreenMask,
   clearGreenCache,
   fetchGreenAreas,
   overpassQuery,
-  odeonsplatzFallback,
   parseOverpass,
-  reach,
   stitch,
-} from "../lib/green.ts";
+} from "../lib/overpass.ts";
 import { planGreenLoops } from "../lib/planner.ts";
+import { mappedParks, parkSource } from "../lib/park-source.ts";
 import { ProviderError } from "../lib/errors.ts";
 import {
   munichParks,
@@ -23,6 +23,29 @@ import {
 const areas = parseOverpass(munichParks);
 const inEG = (p) =>
   inside(p, englischerGartenSouth) || inside(p, englischerGartenNorth);
+
+test("park source explicitly selects the bundled Odeonsplatz corridor", async () => {
+  const signal = new AbortController().signal;
+  const offline = () => {
+    throw Error("Odeonsplatz should not request Overpass");
+  };
+  const local = await parkSource(offline)(odeonsplatz, 10000, signal);
+  assert.equal(local.approximate, true);
+  assert.ok(local.componentName.includes("Englischer Garten"));
+  const remote = await mappedParks(async () => Response.json(munichParks))(
+    odeonsplatz,
+    10000,
+    signal,
+  );
+  assert.equal(remote.approximate, false);
+  assert.ok(remote.componentName.includes("Englischer Garten"));
+  const outside = await parkSource(async () => Response.json({ elements: [] }))(
+    [11.7, 48.2],
+    10000,
+    signal,
+  );
+  assert.equal(outside, null);
+});
 
 test("stitches multipolygon members, including reversed ways", () => {
   const rings = stitch([
@@ -107,9 +130,9 @@ test("mask measures park share, names parks and removes lakes", () => {
 });
 
 test("Odeonsplatz offline corridor keeps waypoints inside the garden", () => {
-  const fallback = odeonsplatzFallback(odeonsplatz);
+  const fallback = odeonsplatzCorridor(odeonsplatz);
   assert.ok(fallback);
-  assert.equal(odeonsplatzFallback([11.7, 48.142]), null);
+  assert.equal(odeonsplatzCorridor([11.7, 48.142]), null);
   const mask = new GreenMask(odeonsplatz, reach(10000), fallback, 0, true);
   assert.equal(mask.approximate, true);
   const plans = planGreenLoops(mask, odeonsplatz, 10000);
@@ -183,6 +206,19 @@ test("park lookup tries a second mirror and caches the result", async () => {
   const again = await fetchGreenAreas(odeonsplatz, 4000, signal, fetcher);
   assert.equal(again, first);
   assert.equal(calls.length, 2);
+  // Each request's search radius and start must match the cached outline.
+  const distinct = async () => {
+    calls.push("distinct");
+    return Response.json(munichParks);
+  };
+  await fetchGreenAreas(
+    [odeonsplatz[0] + 0.0002, odeonsplatz[1]],
+    4000,
+    signal,
+    distinct,
+  );
+  await fetchGreenAreas(odeonsplatz, 4001, signal, distinct);
+  assert.equal(calls.length, 4);
   clearGreenCache();
   await assert.rejects(
     fetchGreenAreas(odeonsplatz, 4000, signal, async () =>

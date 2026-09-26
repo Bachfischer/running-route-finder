@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Map as LeafletMap, LayerGroup, LeafletMouseEvent } from "leaflet";
 import {
   ArrowUpRight,
   LocateFixed,
@@ -19,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toGpx } from "@/lib/gpx";
 import { SiteFooter } from "@/components/site-footer";
+import { useRouteMap } from "@/components/use-route-map";
 import type { LoopResult } from "@/lib/route";
 import { requestJson } from "@/lib/client-api";
 type Place = { lat: number; lon: number; name: string };
@@ -31,9 +31,7 @@ export default function Home() {
     [searching, setSearching] = useState(false),
     [error, setError] = useState(""),
     [result, setResult] = useState<LoopResult | null>(null),
-    [selected, setSelected] = useState(0),
-    [mapReady, setMapReady] = useState(0),
-    [mapError, setMapError] = useState(false);
+    [selected, setSelected] = useState(0);
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -44,14 +42,10 @@ export default function Home() {
     () => new URLSearchParams(window.location.search).get("embed") === "1",
     () => false,
   );
-  const mapRef = useRef<LeafletMap | null>(null),
-    layerRef = useRef<LayerGroup | null>(null),
-    host = useRef<HTMLDivElement>(null),
-    request = useRef(0),
+  const request = useRef(0),
     searchController = useRef<AbortController | null>(null),
     routeController = useRef<AbortController | null>(null),
     busyRef = useRef(false),
-    leaflet = useRef<typeof import("leaflet") | null>(null),
     resultsRef = useRef<HTMLDivElement>(null);
   const chosen = result?.routes[selected];
   useEffect(() => {
@@ -86,101 +80,26 @@ export default function Home() {
       window.removeEventListener("resize", reportHeight);
     };
   }, [embedded]);
+  const { host, mapRef, mapError } = useRouteMap(place, chosen, (pin) => {
+    if (busyRef.current) return;
+    request.current++;
+    searchController.current?.abort();
+    setPlace(pin);
+    setQuery(`${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}`);
+    setPlaces([]);
+    setSearching(false);
+    setResult(null);
+    setError("");
+  });
   useEffect(() => {
-    let alive = true;
-    let instance: LeafletMap | null = null;
-    import("leaflet")
-      .then((L) => {
-        if (!alive || !host.current) return;
-        leaflet.current = L;
-        const map = L.map(host.current, { zoomControl: false }).setView(
-          [48.151, 11.592],
-          13,
-        );
-        instance = map;
-        mapRef.current = map;
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution:
-            '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
-        }).addTo(map);
-        map.on("click", (e: LeafletMouseEvent) => {
-          if (busyRef.current) return;
-          request.current++;
-          searchController.current?.abort();
-          setPlace({
-            lat: e.latlng.lat,
-            lon: e.latlng.lng,
-            name: "Pinned location",
-          });
-          setQuery(`${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`);
-          setPlaces([]);
-          setSearching(false);
-          setResult(null);
-          setError("");
-        });
-        setMapReady((version) => version + 1);
-      })
-      .catch(() => {
-        if (alive) setMapError(true);
-      });
+    // Discard pending provider responses when leaving the page.
     return () => {
-      // This is a request sequence counter, not a DOM ref; invalidate every
-      // pending response when the component unmounts.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       request.current++;
       searchController.current?.abort();
       routeController.current?.abort();
-      alive = false;
-      instance?.remove();
-      if (mapRef.current === instance) {
-        mapRef.current = null;
-        layerRef.current = null;
-        leaflet.current = null;
-      }
     };
   }, []);
-  useEffect(() => {
-    if (!mapReady || !mapRef.current || !leaflet.current) return;
-    const L = leaflet.current!,
-      map = mapRef.current!;
-    map.invalidateSize();
-    layerRef.current?.remove();
-    const group = L.layerGroup().addTo(map);
-    layerRef.current = group;
-    if (chosen) {
-      L.polyline(
-        chosen.coordinates.map((c) => [c[1], c[0]]),
-        { color: "#fff", weight: 9, opacity: 0.95 },
-      ).addTo(group);
-      const line = L.polyline(
-        chosen.coordinates.map((c) => [c[1], c[0]]),
-        { color: "#46675b", weight: 5 },
-      ).addTo(group);
-      map.fitBounds(line.getBounds(), { padding: [65, 65], animate: false });
-      // The result card changes the map size after render; refit once laid out.
-      requestAnimationFrame(() => {
-        if (mapRef.current !== map) return;
-        map.invalidateSize();
-        map.fitBounds(line.getBounds(), { padding: [65, 65], animate: false });
-      });
-    }
-    const start = chosen
-      ? { lat: chosen.coordinates[0][1], lon: chosen.coordinates[0][0] }
-      : place;
-    if (start) {
-      L.circleMarker([start.lat, start.lon], {
-        radius: 8,
-        color: "#fff",
-        weight: 3,
-        fillColor: "#494e52",
-        fillOpacity: 1,
-      })
-        .addTo(group)
-        .bindTooltip("Start / finish");
-      if (!chosen) map.setView([start.lat, start.lon], 14);
-    }
-  }, [place, chosen, mapReady]);
   useEffect(() => {
     if (result) {
       resultsRef.current?.focus({ preventScroll: true });
@@ -289,7 +208,8 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...start,
+            lat: start.lat,
+            lon: start.lon,
             distance: Number(distance),
           }),
         },

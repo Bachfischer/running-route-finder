@@ -3,8 +3,6 @@ export type RouteInput = {
   lat: number;
   lon: number;
   distance: number;
-  /** Accepted for older clients and embeds; the planner no longer uses it. */
-  direction?: string;
 };
 export type Loop = {
   coordinates: Coord[];
