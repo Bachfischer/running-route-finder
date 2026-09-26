@@ -364,23 +364,27 @@ export function parseOverpass(raw: unknown): GreenArea[] {
 }
 
 export function overpassQuery(center: Coord, radius: number): string {
-  const around = `(around:${Math.round(radius)},${center[1].toFixed(6)},${center[0].toFixed(6)})`;
+  // Bounding-box selection is much cheaper for public Overpass instances than
+  // applying a geometry-length and around() predicate to every candidate.
+  const lat = radius / 111_200;
+  const lon = lat / Math.cos(center[1] * RAD);
+  const bbox = `(${(center[1] - lat).toFixed(6)},${(center[0] - lon).toFixed(6)},${(center[1] + lat).toFixed(6)},${(center[0] + lon).toFixed(6)})`;
   const open = `["access"!~"^(private|no|customers)$"]`;
-  return `[out:json][timeout:20][maxsize:67108864];
+  return `[out:json][timeout:15][maxsize:33554432];
 (
-way["leisure"~"^(park|nature_reserve|common|recreation_ground)$"]${open}(if:length()>500)${around};
-relation["leisure"~"^(park|nature_reserve)$"]${open}${around};
-way["landuse"~"^(forest|recreation_ground|village_green)$"]${open}(if:length()>500)${around};
-relation["landuse"="forest"]${open}${around};
-way["natural"="wood"]${open}(if:length()>500)${around};
-relation["natural"="wood"]${open}${around};
-way["natural"="water"](if:length()>300)${around};
+way["leisure"~"^(park|nature_reserve|common|recreation_ground)$"]${open}${bbox};
+relation["leisure"~"^(park|nature_reserve)$"]${open}${bbox};
+way["landuse"~"^(forest|recreation_ground|village_green)$"]${open}${bbox};
+relation["landuse"="forest"]${open}${bbox};
+way["natural"="wood"]${open}${bbox};
+relation["natural"="wood"]${open}${bbox};
+way["natural"="water"]${bbox};
 );
 out geom qt;`;
 }
 
 const mirrors = [
-  "https://overpass-api.de/api/interpreter",
+  "https://z.overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
 ];
 const cache = new Map<string, { at: number; areas: GreenArea[] }>();
@@ -418,6 +422,15 @@ export async function fetchGreenAreas(
       return areas;
     } catch (error) {
       signal.throwIfAborted();
+      console.warn(
+        "park data source unavailable",
+        new URL(url).hostname,
+        error instanceof ProviderError
+          ? error.status
+          : error instanceof Error
+            ? error.name
+            : "unknown",
+      );
       last = error;
     }
   }

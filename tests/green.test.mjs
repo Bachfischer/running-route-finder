@@ -141,11 +141,12 @@ test("overpass query covers parks, woods and water around the start", () => {
     "forest",
     "wood",
     'natural"="water',
-    "around:4567,48.142000,11.577000",
     "private",
     "out geom",
   ])
     assert.ok(q.includes(part), part);
+  assert.match(q, /\(48\.\d{6},11\.\d{6},48\.\d{6},11\.\d{6}\)/);
+  assert.ok(!q.includes("length()"));
   assert.equal(reach(10000), 10000 / 2.4 + 400);
   assert.equal(reach(100000), 8000);
 });
