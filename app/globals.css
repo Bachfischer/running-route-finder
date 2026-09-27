@@ -537,6 +537,17 @@ a {
   font-weight: 700;
   text-transform: uppercase;
 }
+.site-footer-contribute {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.site-footer-contribute a {
+  color: #46675b;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .site-footer-copyright {
   font-size: 11px;
   line-height: 1.5;
