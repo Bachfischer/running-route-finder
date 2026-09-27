@@ -5,6 +5,13 @@ export function SiteFooter() {
         <div className="site-footer-follow">
           <a href="https://bachfischer.me/sitemap/">Sitemap</a>
         </div>
+        <p className="site-footer-contribute">
+          This project is open source.{" "}
+          <a href="https://github.com/Bachfischer/running-route-finder">
+            View the code and contribute on GitHub
+          </a>
+          .
+        </p>
         <div className="site-footer-copyright">
           © {new Date().getFullYear()} Matthias Bachfischer. A project on{" "}
           <a href="https://bachfischer.me/">bachfischer.me</a>.
