@@ -6,11 +6,10 @@ export function SiteFooter() {
           <a href="https://bachfischer.me/sitemap/">Sitemap</a>
         </div>
         <p className="site-footer-contribute">
-          This project is open source.{" "}
+          Contributions are welcome.{" "}
           <a href="https://github.com/Bachfischer/running-route-finder">
-            View the code and contribute on GitHub
+            Explore the open source repository on GitHub
           </a>
-          .
         </p>
         <div className="site-footer-copyright">
           © {new Date().getFullYear()} Matthias Bachfischer. A project on{" "}
